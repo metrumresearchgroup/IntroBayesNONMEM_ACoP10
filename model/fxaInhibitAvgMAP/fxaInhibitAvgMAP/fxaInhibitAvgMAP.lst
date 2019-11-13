@@ -1,0 +1,388 @@
+Fri Aug 23 20:52:43 UTC 2019
+$PROB fxaInhibitAvgMAP example, Emax model
+$INPUT C ID DOSE DV CONC EVID CMT               
+
+$DATA ../../../data/fxaInhAvg.csv     IGNORE=(C='C')
+
+$PRED
+
+MU_1 = THETA(1)
+MU_2 = THETA(2)
+MU_3 = THETA(3)
+MU_4 = THETA(4)
+
+LGT_EMAX = MU_1 + ETA(1)
+
+EMAX = 100 / (1 + EXP(-LGT_EMAX))
+EC50 = EXP(MU_2 + ETA(2))
+GAMMA = EXP(MU_3 + ETA(3))
+SD = EXP(MU_4 + ETA(4))
+
+RESP = EMAX * CONC**GAMMA / (EC50**GAMMA + CONC**GAMMA)
+ 
+Y = RESP + SD * ERR(1) 
+
+; Initial values of THETA
+$THETA
+2.19184207890814      ; EMAX = 100 * EXPIT(THETA(1))
+4.83251007191548  ; EC50 = EXP(THETA(2))
+-0.364821245396368    ; GAMMA = EXP(THETA(3))
+1.85891572682141   ; SD = (THETA(4)) 
+$OMEGA DIAG(4);INITIAL values of OMEGAs
+(0 FIX)
+(0 FIX)
+(0 FIX)
+(0 FIX)
+$SIGMA ;INITIAL values of SIGMAs
+(1 FIX)
+
+
+$PRIOR NWPRI
+$THETAP          ; Prior information of THETAS
+(0 FIX)      ;  THETA(1) EMAX
+(5.5 FIX)      ;  THETA(2) EC50
+(0.75 FIX)      ;  THETA(3) gamma
+(2.3 FIX)      ; THETA(4) SD
+$THETAPV BLOCK(4)     ;  variances for priors on THETAS (var-cov)
+2.0 FIX ; EMAX almost uniform
+0.00 1  ; EC50
+0.00 0.00 0.50  ; gamma
+0.00 0.00 0.00 1   ; SD
+$ESTIMATION
+METHOD = 0
+AUTO= 1
+OLKJDF= 1
+OVARF= -1
+PRINT = 100 NOABORT
+
+SIGL = 12
+SIG = 4
+MAXEVAL = 99999999
+$TABLE ID EVID CONC DV PRED
+NOPRINT ONEHEADER FILE=./fxaInhibitAvgMAP.tab
+$TABLE ID EMAX EC50 GAMMA SD
+NOPRINT ONEHEADER FILE=./fxaInhibitAvgMAPpar.tab
+
+NM-TRAN MESSAGES
+  
+ WARNINGS AND ERRORS (IF ANY) FOR PROBLEM    1
+             
+ (WARNING  2) NM-TRAN INFERS THAT THE DATA ARE POPULATION.
+             
+ (WARNING  97) A RANDOM QUANTITY IS RAISED TO A POWER. IF THE RESULT AFFECTS
+ THE VALUE OF THE OBJECTIVE FUNCTION, THE USER SHOULD ENSURE THAT THE
+ RANDOM QUANTITY IS NEVER 0 WHEN THE POWER IS < 1.
+             
+ (WARNING  99) A RANDOM QUANTITY IS USED AS A POWER. IF THE RESULT AFFECTS
+ THE VALUE OF THE OBJECTIVE FUNCTION, THE USER SHOULD ENSURE THAT THE
+ QUANTITY RAISED TO THE POWER IS NOT 0.
+             
+ (WARNING  13) WITH USER-WRITTEN PRED OR $PRED, NM-TRAN CANNOT APPEND THE
+ MDV DATA ITEM.
+
+License Registered to: Metrum Research Group
+Expiration Date:    14 JUL 2020
+Current Date:       23 AUG 2019
+Days until program expires : 326
+1NONLINEAR MIXED EFFECTS MODEL PROGRAM (NONMEM) VERSION 7.4.3
+ ORIGINALLY DEVELOPED BY STUART BEAL, LEWIS SHEINER, AND ALISON BOECKMANN
+ CURRENT DEVELOPERS ARE ROBERT BAUER, ICON DEVELOPMENT SOLUTIONS,
+ AND ALISON BOECKMANN. IMPLEMENTATION, EFFICIENCY, AND STANDARDIZATION
+ PERFORMED BY NOUS INFOSYSTEMS.
+
+ PROBLEM NO.:         1
+ fxaInhibitAvgMAP example, Emax model
+0DATA CHECKOUT RUN:              NO
+ DATA SET LOCATED ON UNIT NO.:    2
+ THIS UNIT TO BE REWOUND:        NO
+ NO. OF DATA RECS IN DATA SET:       80
+ NO. OF DATA ITEMS IN DATA SET:   7
+ ID DATA ITEM IS DATA ITEM NO.:   2
+ DEP VARIABLE IS DATA ITEM NO.:   4
+0LABELS FOR DATA ITEMS:
+ C ID DOSE DV CONC EVID CMT
+0(NONBLANK) LABELS FOR PRED-DEFINED ITEMS:
+ EMAX EC50 GAMMA SD
+0FORMAT FOR DATA:
+ (7E6.0)
+
+ TOT. NO. OF OBS RECS:       80
+ TOT. NO. OF INDIVIDUALS:       80
+0LENGTH OF THETA:   8
+0DEFAULT THETA BOUNDARY TEST OMITTED:    NO
+0OMEGA HAS BLOCK FORM:
+  1
+  0  2
+  0  0  3
+  0  0  0  4
+  0  0  0  0  5
+  0  0  0  0  5  5
+  0  0  0  0  5  5  5
+  0  0  0  0  5  5  5  5
+0DEFAULT OMEGA BOUNDARY TEST OMITTED:    NO
+0SIGMA HAS SIMPLE DIAGONAL FORM WITH DIMENSION:   1
+0DEFAULT SIGMA BOUNDARY TEST OMITTED:    NO
+0INITIAL ESTIMATE OF THETA:
+ LOWER BOUND    INITIAL EST    UPPER BOUND
+ -0.1000E+07     0.2192E+01     0.1000E+07
+ -0.1000E+07     0.4833E+01     0.1000E+07
+ -0.1000E+07    -0.3648E+00     0.1000E+07
+ -0.1000E+07     0.1859E+01     0.1000E+07
+  0.0000E+00     0.0000E+00     0.0000E+00
+  0.5500E+01     0.5500E+01     0.5500E+01
+  0.7500E+00     0.7500E+00     0.7500E+00
+  0.2300E+01     0.2300E+01     0.2300E+01
+0INITIAL ESTIMATE OF OMEGA:
+ BLOCK SET NO.   BLOCK                                                                    FIXED
+        1                                                                                  YES
+                  0.0000E+00
+        2                                                                                  YES
+                  0.0000E+00
+        3                                                                                  YES
+                  0.0000E+00
+        4                                                                                  YES
+                  0.0000E+00
+        5                                                                                  YES
+                  0.2000E+01
+                  0.0000E+00   0.1000E+01
+                  0.0000E+00   0.0000E+00   0.5000E+00
+                  0.0000E+00   0.0000E+00   0.0000E+00   0.1000E+01
+0INITIAL ESTIMATE OF SIGMA:
+ 0.1000E+01
+0SIGMA CONSTRAINED TO BE THIS INITIAL ESTIMATE
+0TABLES STEP OMITTED:    NO
+ NO. OF TABLES:           2
+ SEED NUMBER (SEED):    11456
+ RANMETHOD:             3U
+ MC SAMPLES (ESAMPLE):    300
+ WRES SQUARE ROOT TYPE (WRESCHOL): EIGENVALUE
+0-- TABLE   1 --
+0RECORDS ONLY:    ALL
+04 COLUMNS APPENDED:    YES
+ PRINTED:                NO
+ HEADER:                YES
+ FILE TO BE FORWARDED:   NO
+ FORMAT:                S1PE11.4
+ LFORMAT:
+ RFORMAT:
+ FIXED_EFFECT_ETAS:
+0USER-CHOSEN ITEMS:
+ ID EVID CONC DV
+0-- TABLE   2 --
+0RECORDS ONLY:    ALL
+04 COLUMNS APPENDED:    YES
+ PRINTED:                NO
+ HEADER:                YES
+ FILE TO BE FORWARDED:   NO
+ FORMAT:                S1PE11.4
+ LFORMAT:
+ RFORMAT:
+ FIXED_EFFECT_ETAS:
+0USER-CHOSEN ITEMS:
+ ID EMAX EC50 GAMMA SD
+0
+ PRIOR SUBROUTINE USER-SUPPLIED
+1
+ 
+ 
+ #TBLN:      1
+ #METH: First Order
+ 
+ ESTIMATION STEP OMITTED:                 NO
+ ANALYSIS TYPE:                           POPULATION
+ NUMBER OF SADDLE POINT RESET ITERATIONS:      0
+ GRADIENT METHOD USED:               NOSLOW
+ EPS-ETA INTERACTION:                     NO
+ NO. OF FUNCT. EVALS. ALLOWED:            99999999
+ NO. OF SIG. FIGURES REQUIRED:            4
+ INTERMEDIATE PRINTOUT:                   YES
+ ESTIMATE OUTPUT TO MSF:                  NO
+ ABORT WITH PRED EXIT CODE 1:             NO
+ IND. OBJ. FUNC. VALUES SORTED:           NO
+ NUMERICAL DERIVATIVE
+       FILE REQUEST (NUMDER):               NONE
+ MAP (ETAHAT) ESTIMATION METHOD (OPTMAP):   0
+ ETA HESSIAN EVALUATION METHOD (ETADER):    0
+ INITIAL ETA FOR MAP ESTIMATION (MCETA):    0
+ SIGDIGITS FOR MAP ESTIMATION (SIGLO):      12
+ GRADIENT SIGDIGITS OF
+       FIXED EFFECTS PARAMETERS (SIGL):     12
+ NOPRIOR SETTING (NOPRIOR):                 OFF
+ NOCOV SETTING (NOCOV):                     OFF
+ DERCONT SETTING (DERCONT):                 OFF
+ FINAL ETA RE-EVALUATION (FNLETA):          ON
+ EXCLUDE NON-INFLUENTIAL (NON-INFL.) ETAS
+       IN SHRINKAGE (ETASTYPE):             NO
+ NON-INFL. ETA CORRECTION (NONINFETA):      OFF
+ RAW OUTPUT FILE (FILE): fxaInhibitAvgMAP.ext
+ EXCLUDE TITLE (NOTITLE):                   NO
+ EXCLUDE COLUMN LABELS (NOLABEL):           NO
+ FORMAT FOR ADDITIONAL FILES (FORMAT):      S1PE12.5
+ PARAMETER ORDER FOR OUTPUTS (ORDER):       TSOL
+ WISHART PRIOR DF INTERPRETATION (WISHTYPE):0
+ KNUTHSUMOFF:                               0
+ INCLUDE LNTWOPI:                           NO
+ INCLUDE CONSTANT TERM TO PRIOR (PRIORC):   NO
+ INCLUDE CONSTANT TERM TO OMEGA (ETA) (OLNTWOPI):NO
+ ADDITIONAL CONVERGENCE TEST (CTYPE=4)?:    NO
+ EM OR BAYESIAN METHOD USED:                 NONE
+
+ 
+ THE FOLLOWING LABELS ARE EQUIVALENT
+ PRED=NPRED
+ RES=NRES
+ WRES=NWRES
+ IWRS=NIWRES
+ IPRD=NIPRED
+ IRS=NIRES
+ 
+ MONITORING OF SEARCH:
+
+ 
+0ITERATION NO.:    0    OBJECTIVE VALUE:   407.079855908670        NO. OF FUNC. EVALS.:   5
+ CUMULATIVE NO. OF FUNC. EVALS.:        5
+ NPARAMETR:  2.1918E+00  4.8325E+00 -3.6482E-01  1.8589E+00
+ PARAMETER:  1.0000E-01  1.0000E-01 -1.0000E-01  1.0000E-01
+ GRADIENT:  -1.6637E+02 -8.5930E+02 -7.1572E+02 -9.1334E+02
+ 
+0ITERATION NO.:   20    OBJECTIVE VALUE:   367.831903133985        NO. OF FUNC. EVALS.: 125
+ CUMULATIVE NO. OF FUNC. EVALS.:      130
+ NPARAMETR:  1.7133E+00  4.6313E+00  5.8694E-02  1.7807E+00
+ PARAMETER:  7.8168E-02  9.5836E-02  1.6088E-02  9.5790E-02
+ GRADIENT:  -2.1890E-02 -3.4106E-02 -2.8509E-02  9.8401E-02
+ 
+ #TERM:
+0MINIMIZATION SUCCESSFUL
+ NO. OF FUNCTION EVALUATIONS USED:      130
+ NO. OF SIG. DIGITS IN FINAL EST.:  4.8
+  
+ TOTAL DATA POINTS NORMALLY DISTRIBUTED (N):           80
+ N*LOG(2PI) CONSTANT TO OBJECTIVE FUNCTION:    147.030165312748     
+ OBJECTIVE FUNCTION VALUE WITHOUT CONSTANT:    367.831903133985     
+ OBJECTIVE FUNCTION VALUE WITH CONSTANT:       514.862068446733     
+ REPORTED OBJECTIVE FUNCTION DOES NOT CONTAIN CONSTANT
+  
+ TOTAL EFFECTIVE ETAS (NIND*NETA):                             0
+  
+ PRIOR CONSTANT TO OBJECTIVE FUNCTION:    7.35150826563738     
+ OBJECTIVE FUNCTION VALUE WITHOUT CONSTANT:    367.831903133985     
+ OBJECTIVE FUNCTION VALUE WITH CONSTANT:       375.183411399623     
+ REPORTED OBJECTIVE FUNCTION DOES NOT CONTAIN CONSTANT
+  
+ #TERE:
+ Elapsed estimation  time in seconds:     0.06
+ Elapsed postprocess time in seconds:     0.00
+1
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ ************************************************************************************************************************
+ ********************                                                                                ********************
+ ********************                                   FIRST ORDER                                  ********************
+ #OBJT:**************                       MINIMUM VALUE OF OBJECTIVE FUNCTION                      ********************
+ ********************                                                                                ********************
+ ************************************************************************************************************************
+ 
+
+
+
+
+
+ #OBJV:********************************************      367.832       **************************************************
+1
+ ************************************************************************************************************************
+ ********************                                                                                ********************
+ ********************                                   FIRST ORDER                                  ********************
+ ********************                             FINAL PARAMETER ESTIMATE                           ********************
+ ********************                                                                                ********************
+ ************************************************************************************************************************
+ 
+
+
+ THETA - VECTOR OF FIXED EFFECTS PARAMETERS   *********
+
+
+         TH 1      TH 2      TH 3      TH 4     
+ 
+         1.71E+00  4.63E+00  5.87E-02  1.78E+00
+ 
+
+
+ OMEGA - COV MATRIX FOR RANDOM EFFECTS - ETAS  ********
+
+
+         ETA1      ETA2      ETA3      ETA4     
+ 
+ ETA1
++        0.00E+00
+ 
+ ETA2
++        0.00E+00  0.00E+00
+ 
+ ETA3
++        0.00E+00  0.00E+00  0.00E+00
+ 
+ ETA4
++        0.00E+00  0.00E+00  0.00E+00  0.00E+00
+ 
+
+
+ SIGMA - COV MATRIX FOR RANDOM EFFECTS - EPSILONS  ****
+
+
+         EPS1     
+ 
+ EPS1
++        1.00E+00
+ 
+1
+
+
+ OMEGA - CORR MATRIX FOR RANDOM EFFECTS - ETAS  *******
+
+
+         ETA1      ETA2      ETA3      ETA4     
+ 
+ ETA1
++        0.00E+00
+ 
+ ETA2
++        0.00E+00  0.00E+00
+ 
+ ETA3
++        0.00E+00  0.00E+00  0.00E+00
+ 
+ ETA4
++        0.00E+00  0.00E+00  0.00E+00  0.00E+00
+ 
+
+
+ SIGMA - CORR MATRIX FOR RANDOM EFFECTS - EPSILONS  ***
+
+
+         EPS1     
+ 
+ EPS1
++        1.00E+00
+ 
+ Elapsed finaloutput time in seconds:     0.01
+ #CPUT: Total CPU Time in Seconds,        0.101
+Stop Time:
+Fri Aug 23 20:52:44 UTC 2019

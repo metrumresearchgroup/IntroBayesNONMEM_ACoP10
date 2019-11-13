@@ -1,0 +1,2029 @@
+<log>
+ <logged on="run">
+  <config>
+   <!--Linux / Darwin with ifort compile opts for cross-platform reproducibility.-->
+   <alias id="folder">/mnt/nm743CD</alias>
+   <alias id="target">/opt/NONMEM/nm74</alias>
+   <alias id="origin">/mnt/nmqual-8.4.0</alias>
+   <alias id="unlock">/etc/chef/cookbooks/ifort-nonmem/files/default/nonmem.lic</alias>
+   <alias id="mpicha">/usr/local/mpich3/lib/libmpich.a</alias>
+   <!--The meta interface groups commands that collect metadata.-->
+   <do on="meta">pwd</do>
+   <do on="meta">date</do>
+   <do on="meta">perl -e 'use POSIX; print join qq(,),uname'</do>
+   <do on="meta">echo $SHELL</do>
+   <do on="meta">echo $USER</do>
+   <do on="meta">echo $PATH</do>
+   <do on="meta">head -n 5 target/util/nmfe74</do>
+   <do on="meta">which ifort</do>
+   <!--The 'install' interface installs NONMEM.-->
+   <do on="install">date</do>
+   <do on="install">rm -rf origin/temp</do>
+   <do on="install">mkdir origin/temp</do>
+   <do on="install">cp -r folder/* origin/temp</do>
+   <do on="install" in="origin">patch -p0 temp/SETUP74 nix/setup74.diff</do>
+   <!--alters compile options in setup73-->
+   <do on="install">rm -rf target</do>
+   <do on="install">mkdir target</do>
+   <do on="install" in="origin/temp">pwd</do>
+   <do on="install" in="origin/temp">ifort --version</do>
+   <do on="install" in="origin/temp">/bin/bash SETUP74 origin/temp target ifort y ar same rec q unzip nonmem74e.zip nonmem74r.zip</do>
+   <do on="install">mkdir target/nmqual</do>
+   <do on="install">mkdir target/nmqual/doc</do>
+   <do on="install">cp $0 target/nmqual</do>
+   <!--runtime copy of autolog.pl, uses nmqual/log.xml as config-->
+   <do on="install">cp -r origin/con target/nmqual</do>
+   <!--support for processing xml docs-->
+   <do on="install">cp -r origin/csv target/nmqual</do>
+   <!--support for processing csv docs-->
+   <do on="install">cp origin/doc/nix/* target/nmqual/doc</do>
+   <!--reference modeling results-->
+   <do on="install">cp -r origin/psn target/nmqual</do>
+   <!--support for psn qualification-->
+   <do on="install">cp origin/nix/setup74.diff target/nmqual/doc</do>
+   <!--keep for archival purposes-->
+   <do on="install">cp origin/temp/SETUP74 target/nmqual/doc</do>
+   <!--keep for archival purposes-->
+   <do on="install">rm -rf origin/temp</do>
+   <do on="install">cp -r origin/test target/nmqual</do>
+   <!--supports control tests-->
+   <do on="install">chmod 0777 target/license/nonmem.lic</do>
+   <!--enable overwriting-->
+   <do on="install">cp unlock target/license/nonmem.lic</do>
+   <!--replace expired license-->
+   <do on="install">cp mpicha target/mpi/mpi_lini</do>
+   <!--replace default mpich archive-->
+   <!--patch util/nmfe73 and run/nmfe73 to accept compile/execute option-->
+   <do on="install">cp target/util/nmfe74 target/util/nmfe74.old</do>
+   <do on="install">cp target/util/nmfe74 target/run/nmfe74.old</do>
+   <do on="install">patch -p0 -R target/util/nmfe74 nix/nmfe74.diff</do>
+   <do on="install">patch -p0 -R target/run/nmfe74 nix/nmfe74.diff</do>
+   <do on="install" as="xml">perl $0 $_0 meta</do>
+   <to on="install">target/nmqual/log.xml</to>
+   <!--The 'basic' interface does not expect a compile/execute argument (nmfe73-as-modified no longer requires it).-->
+   <!--Run directory and run name are required arguments.-->
+   <do on="basic" as="xml">perl $0 $_0 meta</do>
+   <do on="basic" in="$_1">target/util/nmfe74 $_2.ctl $_2.lst</do>
+   <do on="basic" in="$_1" as="xml">if [ -e $_2.xml ];then cat $_2.xml;else echo \&lt;nofile/\>; fi</do>
+   <do on="basic" as="xml">cat target/nmqual/log.xml</do>
+   <to on="basic">$_1/$_2.log.xml</to>
+   <!--The 'run' interface expects a leading compile/execute argument.-->
+   <do on="run" as="xml">perl $0 $_0 meta</do>
+   <do on="run" in="$_2">target/util/nmfe74 $_1 $_3.ctl $_3.lst</do>
+   <do on="run" in="$_2" as="xml">if [ -e $_3.xml ];then cat $_3.xml;else echo \&lt;nofile/\>; fi</do>
+   <do on="run" as="xml">cat target/nmqual/log.xml</do>
+   <to on="run">$_2/$_3.log.xml</to>
+   <!--The 'para' interface additionally expects [run].pnm to be present in the run directory.-->
+   <do on="para" as="xml">perl $0 $_0 meta</do>
+   <do on="para" in="$_2">target/util/nmfe74 $_1 $_3.ctl $_3.lst -parafile=$_3.pnm</do>
+   <do on="para" in="$_2" as="xml">if [ -e $_3.xml ];then cat $_3.xml;else echo \&lt;nofile/\>; fi</do>
+   <do on="para" as="xml">cat target/nmqual/log.xml</do>
+   <to on="para">$_2/$_3.log.xml</to>
+   <!--The 'test' interface invokes nmfe directly, without the compile/execute argument.-->
+   <do on="test" in="target/nmqual/test">target/util/nmfe74 $_1.ctl $_1.lst</do>
+   <do on="test" in="target/nmqual/test" as="xml">cat $_1.xml</do>
+   <!--The 'qualify' interface runs a full suite of qualification tests.-->
+   <do on="qualify" as="xml">perl $0 $_0 meta</do>
+   <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 3</do>
+   <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 4</do>
+   <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 5</do>
+   <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 6</do>
+   <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 7</do>
+   <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 8</do>
+   <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test example5</do>
+   <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test example6</do>
+   <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test example7</do>
+   <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test example10</do>
+   <do on="qualify" as="xml">cat target/nmqual/log.xml</do>
+   <to on="qualify">$_1</to>
+   <!--The 'regress' interface runs a reduced suite of tests quickly, e.g. for regression testing.-->
+   <do on="regress" as="xml">perl $0 $_0 meta</do>
+   <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 3</do>
+   <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 4</do>
+   <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 5</do>
+   <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 6</do>
+   <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 7</do>
+   <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 8</do>
+   <do on="regress" as="xml">cat target/nmqual/log.xml</do>
+   <to on="regress">$_1</to>
+   <!--The 'psntest' interface runs PsN control tests.-->
+   <do on="psntest" as="xml">perl $0 $_0 meta</do>
+   <do on="psntest" in="target/nmqual/psn">execute -directory=runs -seed=1 TST33611.nmctl TST33612.nmctl TST33613.nmctl</do>
+   <do on="psntest" in="target/nmqual/psn">bootstrap -samples=20 -dir=boot -seed=1 TST3362.nmctl</do>
+   <do on="psntest" in="target/nmqual/psn/runs" as="xml">perl target/nmqual/csv/csv2xml.pl raw_results_TST33611.csv</do>
+   <do on="psntest" in="target/nmqual/psn/boot" as="xml">perl target/nmqual/csv/csv2xml.pl raw_results_TST3362.csv</do>
+   <do on="psntest" in="target/nmqual/psn/boot" as="xml">perl target/nmqual/csv/sections2csv.pl '^means' bootstrap_results.csv | perl target/nmqual/csv/csv2xml.pl</do>
+   <do on="psntest" in="target/nmqual/psn/boot" as="xml">perl target/nmqual/csv/sections2csv.pl standard.error.confidence.intervals bootstrap_results.csv | perl target/nmqual/csv/csv2xml.pl</do>
+   <do on="psntest" as="xml">cat target/nmqual/log.xml</do>
+   <to on="psntest">$_1</to>
+   <!--The 'accept' interface embeds an acceptance statement at the end of the log.-->
+   <do on="accept">echo $_</do>
+   <to on="accept">$0</to>
+  </config>
+  <job>
+   <do>perl /opt/NONMEM/nm74/nmqual/autolog.pl /opt/NONMEM/nm74/nmqual/log.xml meta</do>
+   <so>
+    <log>
+     <logged on="meta">
+      <config>
+       <!--Linux / Darwin with ifort compile opts for cross-platform reproducibility.-->
+       <alias id="folder">/mnt/nm743CD</alias>
+       <alias id="target">/opt/NONMEM/nm74</alias>
+       <alias id="origin">/mnt/nmqual-8.4.0</alias>
+       <alias id="unlock">/etc/chef/cookbooks/ifort-nonmem/files/default/nonmem.lic</alias>
+       <alias id="mpicha">/usr/local/mpich3/lib/libmpich.a</alias>
+       <!--The meta interface groups commands that collect metadata.-->
+       <do on="meta">pwd</do>
+       <do on="meta">date</do>
+       <do on="meta">perl -e 'use POSIX; print join qq(,),uname'</do>
+       <do on="meta">echo $SHELL</do>
+       <do on="meta">echo $USER</do>
+       <do on="meta">echo $PATH</do>
+       <do on="meta">head -n 5 target/util/nmfe74</do>
+       <do on="meta">which ifort</do>
+       <!--The 'install' interface installs NONMEM.-->
+       <do on="install">date</do>
+       <do on="install">rm -rf origin/temp</do>
+       <do on="install">mkdir origin/temp</do>
+       <do on="install">cp -r folder/* origin/temp</do>
+       <do on="install" in="origin">patch -p0 temp/SETUP74 nix/setup74.diff</do>
+       <!--alters compile options in setup73-->
+       <do on="install">rm -rf target</do>
+       <do on="install">mkdir target</do>
+       <do on="install" in="origin/temp">pwd</do>
+       <do on="install" in="origin/temp">ifort --version</do>
+       <do on="install" in="origin/temp">/bin/bash SETUP74 origin/temp target ifort y ar same rec q unzip nonmem74e.zip nonmem74r.zip</do>
+       <do on="install">mkdir target/nmqual</do>
+       <do on="install">mkdir target/nmqual/doc</do>
+       <do on="install">cp $0 target/nmqual</do>
+       <!--runtime copy of autolog.pl, uses nmqual/log.xml as config-->
+       <do on="install">cp -r origin/con target/nmqual</do>
+       <!--support for processing xml docs-->
+       <do on="install">cp -r origin/csv target/nmqual</do>
+       <!--support for processing csv docs-->
+       <do on="install">cp origin/doc/nix/* target/nmqual/doc</do>
+       <!--reference modeling results-->
+       <do on="install">cp -r origin/psn target/nmqual</do>
+       <!--support for psn qualification-->
+       <do on="install">cp origin/nix/setup74.diff target/nmqual/doc</do>
+       <!--keep for archival purposes-->
+       <do on="install">cp origin/temp/SETUP74 target/nmqual/doc</do>
+       <!--keep for archival purposes-->
+       <do on="install">rm -rf origin/temp</do>
+       <do on="install">cp -r origin/test target/nmqual</do>
+       <!--supports control tests-->
+       <do on="install">chmod 0777 target/license/nonmem.lic</do>
+       <!--enable overwriting-->
+       <do on="install">cp unlock target/license/nonmem.lic</do>
+       <!--replace expired license-->
+       <do on="install">cp mpicha target/mpi/mpi_lini</do>
+       <!--replace default mpich archive-->
+       <!--patch util/nmfe73 and run/nmfe73 to accept compile/execute option-->
+       <do on="install">cp target/util/nmfe74 target/util/nmfe74.old</do>
+       <do on="install">cp target/util/nmfe74 target/run/nmfe74.old</do>
+       <do on="install">patch -p0 -R target/util/nmfe74 nix/nmfe74.diff</do>
+       <do on="install">patch -p0 -R target/run/nmfe74 nix/nmfe74.diff</do>
+       <do on="install" as="xml">perl $0 $_0 meta</do>
+       <to on="install">target/nmqual/log.xml</to>
+       <!--The 'basic' interface does not expect a compile/execute argument (nmfe73-as-modified no longer requires it).-->
+       <!--Run directory and run name are required arguments.-->
+       <do on="basic" as="xml">perl $0 $_0 meta</do>
+       <do on="basic" in="$_1">target/util/nmfe74 $_2.ctl $_2.lst</do>
+       <do on="basic" in="$_1" as="xml">if [ -e $_2.xml ];then cat $_2.xml;else echo \&lt;nofile/\>; fi</do>
+       <do on="basic" as="xml">cat target/nmqual/log.xml</do>
+       <to on="basic">$_1/$_2.log.xml</to>
+       <!--The 'run' interface expects a leading compile/execute argument.-->
+       <do on="run" as="xml">perl $0 $_0 meta</do>
+       <do on="run" in="$_2">target/util/nmfe74 $_1 $_3.ctl $_3.lst</do>
+       <do on="run" in="$_2" as="xml">if [ -e $_3.xml ];then cat $_3.xml;else echo \&lt;nofile/\>; fi</do>
+       <do on="run" as="xml">cat target/nmqual/log.xml</do>
+       <to on="run">$_2/$_3.log.xml</to>
+       <!--The 'para' interface additionally expects [run].pnm to be present in the run directory.-->
+       <do on="para" as="xml">perl $0 $_0 meta</do>
+       <do on="para" in="$_2">target/util/nmfe74 $_1 $_3.ctl $_3.lst -parafile=$_3.pnm</do>
+       <do on="para" in="$_2" as="xml">if [ -e $_3.xml ];then cat $_3.xml;else echo \&lt;nofile/\>; fi</do>
+       <do on="para" as="xml">cat target/nmqual/log.xml</do>
+       <to on="para">$_2/$_3.log.xml</to>
+       <!--The 'test' interface invokes nmfe directly, without the compile/execute argument.-->
+       <do on="test" in="target/nmqual/test">target/util/nmfe74 $_1.ctl $_1.lst</do>
+       <do on="test" in="target/nmqual/test" as="xml">cat $_1.xml</do>
+       <!--The 'qualify' interface runs a full suite of qualification tests.-->
+       <do on="qualify" as="xml">perl $0 $_0 meta</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 3</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 4</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 5</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 6</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 7</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 8</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test example5</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test example6</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test example7</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test example10</do>
+       <do on="qualify" as="xml">cat target/nmqual/log.xml</do>
+       <to on="qualify">$_1</to>
+       <!--The 'regress' interface runs a reduced suite of tests quickly, e.g. for regression testing.-->
+       <do on="regress" as="xml">perl $0 $_0 meta</do>
+       <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 3</do>
+       <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 4</do>
+       <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 5</do>
+       <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 6</do>
+       <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 7</do>
+       <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 8</do>
+       <do on="regress" as="xml">cat target/nmqual/log.xml</do>
+       <to on="regress">$_1</to>
+       <!--The 'psntest' interface runs PsN control tests.-->
+       <do on="psntest" as="xml">perl $0 $_0 meta</do>
+       <do on="psntest" in="target/nmqual/psn">execute -directory=runs -seed=1 TST33611.nmctl TST33612.nmctl TST33613.nmctl</do>
+       <do on="psntest" in="target/nmqual/psn">bootstrap -samples=20 -dir=boot -seed=1 TST3362.nmctl</do>
+       <do on="psntest" in="target/nmqual/psn/runs" as="xml">perl target/nmqual/csv/csv2xml.pl raw_results_TST33611.csv</do>
+       <do on="psntest" in="target/nmqual/psn/boot" as="xml">perl target/nmqual/csv/csv2xml.pl raw_results_TST3362.csv</do>
+       <do on="psntest" in="target/nmqual/psn/boot" as="xml">perl target/nmqual/csv/sections2csv.pl '^means' bootstrap_results.csv | perl target/nmqual/csv/csv2xml.pl</do>
+       <do on="psntest" in="target/nmqual/psn/boot" as="xml">perl target/nmqual/csv/sections2csv.pl standard.error.confidence.intervals bootstrap_results.csv | perl target/nmqual/csv/csv2xml.pl</do>
+       <do on="psntest" as="xml">cat target/nmqual/log.xml</do>
+       <to on="psntest">$_1</to>
+       <!--The 'accept' interface embeds an acceptance statement at the end of the log.-->
+       <do on="accept">echo $_</do>
+       <to on="accept">$0</to>
+      </config>
+      <job>
+       <do>pwd</do>
+       <so>/data/IntroBayesNONMEM/script</so>
+      </job>
+      <job>
+       <do>date</do>
+       <so>Fri Aug 23 21:06:26 UTC 2019</so>
+      </job>
+      <job>
+       <do>perl -e 'use POSIX; print join qq(,),uname'</do>
+       <so>Linux,ip-172-16-2-230,3.13.0-93-generic,#140-Ubuntu SMP Mon Jul 18 21:21:05 UTC 2016,x86_64</so>
+      </job>
+      <job>
+       <do>echo $SHELL</do>
+       <so>/bin/bash</so>
+      </job>
+      <job>
+       <do>echo $USER</do>
+       <so>billg</so>
+      </job>
+      <job>
+       <do>echo $PATH</do>
+       <so>/usr/local/mpich3/bin:/usr/local/mpich3gf/bin:/opt/intel/bin/intel64:/opt/intel/mpirt/bin/intel64:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/opt/sge/bin/lx-amd64:/usr/local/texlive/2013/bin/x86_64-linux</so>
+      </job>
+      <job>
+       <do>head -n 5 /opt/NONMEM/nm74/util/nmfe74</do>
+       <so>#!/bin/bash
+          dir=/opt/NONMEM/nm74
+          f=ifort
+          o=' -fp-model strict -Gs -nologo -nbs -w '
+          opstat=' -static '</so>
+      </job>
+      <job>
+       <do>which ifort</do>
+       <so>/opt/intel/bin/intel64/ifort</so>
+      </job>
+     </logged>
+    </log>
+   </so>
+  </job>
+  <job>
+   <do in="/data/IntroBayesNONMEM/model/fxaInhibitAvgBAYES/fxaInhibitAvgBAYES.1">/opt/NONMEM/nm74/util/nmfe74 ce fxaInhibitAvgBAYES.1.ctl fxaInhibitAvgBAYES.1.lst</do>
+   <so>Starting NMTRAN
+     
+    WARNINGS AND ERRORS (IF ANY) FOR PROBLEM    1
+                
+    (WARNING  2) NM-TRAN INFERS THAT THE DATA ARE POPULATION.
+                
+    (WARNING  66) WITH "LAPLACIAN" AND "INTERACTION", "NUMERICAL" AND "SLOW"
+    ARE ALSO REQUIRED ON $ESTIM RECORD. NM-TRAN HAS SUPPLIED THESE OPTIONS.
+                
+    (WARNING  97) A RANDOM QUANTITY IS RAISED TO A POWER. IF THE RESULT AFFECTS
+    THE VALUE OF THE OBJECTIVE FUNCTION, THE USER SHOULD ENSURE THAT THE
+    RANDOM QUANTITY IS NEVER 0 WHEN THE POWER IS &lt; 1.
+                
+    (WARNING  99) A RANDOM QUANTITY IS USED AS A POWER. IF THE RESULT AFFECTS
+    THE VALUE OF THE OBJECTIVE FUNCTION, THE USER SHOULD ENSURE THAT THE
+    QUANTITY RAISED TO THE POWER IS NOT 0.
+                
+    (WARNING  13) WITH USER-WRITTEN PRED OR $PRED, NM-TRAN CANNOT APPEND THE
+    MDV DATA ITEM.
+   
+    (MU_WARNING 20) MU_001: MU_ VARIABLE SHOULD NOT BE DEFINED AFTER VERBATIM CODE.
+   Recompiling certain components
+   Building NONMEM Executable
+   Starting nonmem execution ...
+   License Registered to: Metrum Research Group
+   Expiration Date:    14 JUL 2020
+   Current Date:       23 AUG 2019
+   Days until program expires : 326
+    
+    
+    MCMC Bayesian Analysis
+    MONITORING OF SEARCH:
+   
+    Burn-in Mode
+    iteration       -10000 MCMCOBJ=    600.784048717327     
+    iteration        -9900 MCMCOBJ=    380.143536948164     
+    iteration        -9800 MCMCOBJ=    371.610153669795     
+    iteration        -9700 MCMCOBJ=    372.208523380618     
+    iteration        -9600 MCMCOBJ=    368.509250560253     
+    iteration        -9500 MCMCOBJ=    369.324461068313     
+    iteration        -9400 MCMCOBJ=    373.954089603176     
+    iteration        -9300 MCMCOBJ=    368.884101006072     
+    iteration        -9200 MCMCOBJ=    370.494343260782     
+    iteration        -9100 MCMCOBJ=    368.527831816190     
+    iteration        -9000 MCMCOBJ=    372.092865058959     
+    iteration        -8900 MCMCOBJ=    376.551939896274     
+    iteration        -8800 MCMCOBJ=    368.407327644416     
+    iteration        -8700 MCMCOBJ=    369.987505381174     
+    iteration        -8600 MCMCOBJ=    370.778634445755     
+    iteration        -8500 MCMCOBJ=    369.796991955276     
+    iteration        -8400 MCMCOBJ=    373.969050123336     
+    iteration        -8300 MCMCOBJ=    369.835127265363     
+    iteration        -8200 MCMCOBJ=    376.727420406265     
+    iteration        -8100 MCMCOBJ=    370.171910321052     
+    iteration        -8000 MCMCOBJ=    374.295634291694     
+    iteration        -7900 MCMCOBJ=    371.495026566162     
+    iteration        -7800 MCMCOBJ=    368.219801186538     
+    iteration        -7700 MCMCOBJ=    371.375304616917     
+    iteration        -7600 MCMCOBJ=    370.328661173118     
+    iteration        -7500 MCMCOBJ=    369.522216880126     
+    iteration        -7400 MCMCOBJ=    369.588202149651     
+    iteration        -7300 MCMCOBJ=    367.282576081793     
+    iteration        -7200 MCMCOBJ=    372.332306299172     
+    iteration        -7100 MCMCOBJ=    371.879302279411     
+    iteration        -7000 MCMCOBJ=    367.976161555391     
+    iteration        -6900 MCMCOBJ=    371.650834192760     
+    iteration        -6800 MCMCOBJ=    368.270853535593     
+    iteration        -6700 MCMCOBJ=    370.863245927449     
+    iteration        -6600 MCMCOBJ=    368.048412282444     
+    iteration        -6500 MCMCOBJ=    376.688135354554     
+    iteration        -6400 MCMCOBJ=    370.224531475762     
+    iteration        -6300 MCMCOBJ=    374.270890614949     
+    iteration        -6200 MCMCOBJ=    367.454842043856     
+    iteration        -6100 MCMCOBJ=    370.540456038572     
+    iteration        -6000 MCMCOBJ=    370.283121377427     
+    iteration        -5900 MCMCOBJ=    370.509299094434     
+    iteration        -5800 MCMCOBJ=    367.312536014769     
+    iteration        -5700 MCMCOBJ=    369.139719895859     
+    iteration        -5600 MCMCOBJ=    367.166266831439     
+    iteration        -5500 MCMCOBJ=    374.304204790874     
+    iteration        -5400 MCMCOBJ=    375.089304013629     
+    iteration        -5300 MCMCOBJ=    369.744869164729     
+    iteration        -5200 MCMCOBJ=    380.179907538003     
+    iteration        -5100 MCMCOBJ=    368.445258161609     
+    iteration        -5000 MCMCOBJ=    373.570046186410     
+    iteration        -4900 MCMCOBJ=    368.791721577639     
+    iteration        -4800 MCMCOBJ=    367.853682396357     
+    iteration        -4700 MCMCOBJ=    371.594642138944     
+    iteration        -4600 MCMCOBJ=    369.486748155560     
+    iteration        -4500 MCMCOBJ=    374.703572262379     
+    iteration        -4400 MCMCOBJ=    367.842303405287     
+    iteration        -4300 MCMCOBJ=    374.664265003478     
+    iteration        -4200 MCMCOBJ=    377.211991115053     
+    iteration        -4100 MCMCOBJ=    368.489839859355     
+    iteration        -4000 MCMCOBJ=    371.359045682944     
+    iteration        -3900 MCMCOBJ=    368.234947249463     
+    iteration        -3800 MCMCOBJ=    370.445607794642     
+    iteration        -3700 MCMCOBJ=    371.017443208320     
+    iteration        -3600 MCMCOBJ=    369.053432957579     
+    iteration        -3500 MCMCOBJ=    372.121628291176     
+    iteration        -3400 MCMCOBJ=    368.600458241003     
+    iteration        -3300 MCMCOBJ=    368.233973342276     
+    iteration        -3200 MCMCOBJ=    379.418018819300     
+    iteration        -3100 MCMCOBJ=    371.244335329911     
+    iteration        -3000 MCMCOBJ=    368.636843214304     
+    iteration        -2900 MCMCOBJ=    386.695175491275     
+    iteration        -2800 MCMCOBJ=    367.330511493966     
+    iteration        -2700 MCMCOBJ=    370.058434621728     
+    iteration        -2600 MCMCOBJ=    367.856339855776     
+    iteration        -2500 MCMCOBJ=    372.850194571262     
+    iteration        -2400 MCMCOBJ=    372.228101100029     
+    iteration        -2300 MCMCOBJ=    367.636175230656     
+    iteration        -2200 MCMCOBJ=    372.709242757476     
+    iteration        -2100 MCMCOBJ=    369.974423871108     
+    iteration        -2000 MCMCOBJ=    369.948047576593     
+    iteration        -1900 MCMCOBJ=    369.928459827311     
+    iteration        -1800 MCMCOBJ=    368.909339667014     
+    iteration        -1700 MCMCOBJ=    369.910091674717     
+    iteration        -1600 MCMCOBJ=    369.753368666940     
+    iteration        -1500 MCMCOBJ=    367.947995054088     
+    iteration        -1400 MCMCOBJ=    371.971124532115     
+    iteration        -1300 MCMCOBJ=    367.857026600929     
+    iteration        -1200 MCMCOBJ=    368.148729057882     
+    iteration        -1100 MCMCOBJ=    369.160452613305     
+    iteration        -1000 MCMCOBJ=    370.228780325561     
+    iteration         -900 MCMCOBJ=    374.010487490773     
+    iteration         -800 MCMCOBJ=    371.192520816386     
+    iteration         -700 MCMCOBJ=    375.885935438766     
+    iteration         -600 MCMCOBJ=    367.126877806908     
+    iteration         -500 MCMCOBJ=    372.996236068444     
+    iteration         -400 MCMCOBJ=    369.103790874486     
+    iteration         -300 MCMCOBJ=    371.017543760797     
+    iteration         -200 MCMCOBJ=    374.118127755348     
+    iteration         -100 MCMCOBJ=    370.764393535209     
+    Sampling Mode
+    iteration            0 MCMCOBJ=    368.512353449945     
+    iteration          100 MCMCOBJ=    369.255116686596     
+    iteration          200 MCMCOBJ=    371.456999129345     
+    iteration          300 MCMCOBJ=    374.988330155189     
+    iteration          400 MCMCOBJ=    371.656962837656     
+    iteration          500 MCMCOBJ=    377.838287995176     
+    iteration          600 MCMCOBJ=    372.264596395567     
+    iteration          700 MCMCOBJ=    372.101680834613     
+    iteration          800 MCMCOBJ=    372.107060094301     
+    iteration          900 MCMCOBJ=    374.165551552157     
+    iteration         1000 MCMCOBJ=    377.450687487502     
+    iteration         1100 MCMCOBJ=    371.834946097476     
+    iteration         1200 MCMCOBJ=    368.236267458539     
+    iteration         1300 MCMCOBJ=    368.761748476491     
+    iteration         1400 MCMCOBJ=    371.531127769461     
+    iteration         1500 MCMCOBJ=    370.875448102868     
+    iteration         1600 MCMCOBJ=    369.405492107364     
+    iteration         1700 MCMCOBJ=    372.809941996599     
+    iteration         1800 MCMCOBJ=    372.087053127326     
+    iteration         1900 MCMCOBJ=    370.388596843207     
+    iteration         2000 MCMCOBJ=    374.714377443598     
+    iteration         2100 MCMCOBJ=    370.115239510987     
+    iteration         2200 MCMCOBJ=    373.561774507387     
+    iteration         2300 MCMCOBJ=    376.794690254378     
+    iteration         2400 MCMCOBJ=    370.656375149281     
+    iteration         2500 MCMCOBJ=    375.985252181475     
+    iteration         2600 MCMCOBJ=    370.552242259113     
+    iteration         2700 MCMCOBJ=    370.100572820368     
+    iteration         2800 MCMCOBJ=    369.754849324757     
+    iteration         2900 MCMCOBJ=    371.059397362809     
+    iteration         3000 MCMCOBJ=    372.261986859492     
+    iteration         3100 MCMCOBJ=    368.707004539331     
+    iteration         3200 MCMCOBJ=    368.393154387405     
+    iteration         3300 MCMCOBJ=    371.639245642206     
+    iteration         3400 MCMCOBJ=    369.823028746258     
+    iteration         3500 MCMCOBJ=    367.168668918051     
+    iteration         3600 MCMCOBJ=    368.615050059718     
+    iteration         3700 MCMCOBJ=    369.882012409014     
+    iteration         3800 MCMCOBJ=    368.266746107202     
+    iteration         3900 MCMCOBJ=    368.917134890606     
+    iteration         4000 MCMCOBJ=    370.660818942883     
+    iteration         4100 MCMCOBJ=    369.058118419209     
+    iteration         4200 MCMCOBJ=    369.373365518592     
+    iteration         4300 MCMCOBJ=    374.421375778233     
+    iteration         4400 MCMCOBJ=    370.744432675022     
+    iteration         4500 MCMCOBJ=    370.176597434925     
+    iteration         4600 MCMCOBJ=    379.287369881394     
+    iteration         4700 MCMCOBJ=    368.048820236640     
+    iteration         4800 MCMCOBJ=    370.443824280970     
+    iteration         4900 MCMCOBJ=    369.115750379824     
+    iteration         5000 MCMCOBJ=    368.249954026162     
+    iteration         5100 MCMCOBJ=    368.963368709532     
+    iteration         5200 MCMCOBJ=    369.301992921012     
+    iteration         5300 MCMCOBJ=    369.608188336739     
+    iteration         5400 MCMCOBJ=    377.619087257537     
+    iteration         5500 MCMCOBJ=    371.646922025269     
+    iteration         5600 MCMCOBJ=    367.812822123415     
+    iteration         5700 MCMCOBJ=    374.143734086483     
+    iteration         5800 MCMCOBJ=    369.162342343856     
+    iteration         5900 MCMCOBJ=    368.637951051866     
+    iteration         6000 MCMCOBJ=    367.929570423086     
+    iteration         6100 MCMCOBJ=    371.075085985281     
+    iteration         6200 MCMCOBJ=    368.620708041112     
+    iteration         6300 MCMCOBJ=    374.789990692740     
+    iteration         6400 MCMCOBJ=    375.744548264580     
+    iteration         6500 MCMCOBJ=    374.700542502837     
+    iteration         6600 MCMCOBJ=    377.676195283645     
+    iteration         6700 MCMCOBJ=    373.418599912352     
+    iteration         6800 MCMCOBJ=    367.896422202866     
+    iteration         6900 MCMCOBJ=    367.383274887824     
+    iteration         7000 MCMCOBJ=    369.477618973307     
+    iteration         7100 MCMCOBJ=    369.483169645448     
+    iteration         7200 MCMCOBJ=    369.651118754960     
+    iteration         7300 MCMCOBJ=    370.672891189355     
+    iteration         7400 MCMCOBJ=    369.405639851255     
+    iteration         7500 MCMCOBJ=    369.479026039385     
+    iteration         7600 MCMCOBJ=    368.396101952498     
+    iteration         7700 MCMCOBJ=    369.563544459014     
+    iteration         7800 MCMCOBJ=    372.038293629684     
+    iteration         7900 MCMCOBJ=    366.877245351050     
+    iteration         8000 MCMCOBJ=    376.733153162570     
+    iteration         8100 MCMCOBJ=    370.249820178825     
+    iteration         8200 MCMCOBJ=    367.421296745165     
+    iteration         8300 MCMCOBJ=    373.166685249400     
+    iteration         8400 MCMCOBJ=    367.572088221429     
+    iteration         8500 MCMCOBJ=    369.795375008588     
+    iteration         8600 MCMCOBJ=    371.410246860548     
+    iteration         8700 MCMCOBJ=    371.437814802136     
+    iteration         8800 MCMCOBJ=    367.567567137277     
+    iteration         8900 MCMCOBJ=    371.605261674153     
+    iteration         9000 MCMCOBJ=    370.031389042279     
+    iteration         9100 MCMCOBJ=    370.512438278978     
+    iteration         9200 MCMCOBJ=    377.889455221398     
+    iteration         9300 MCMCOBJ=    371.470971438774     
+    iteration         9400 MCMCOBJ=    370.366008794660     
+    iteration         9500 MCMCOBJ=    368.188322288237     
+    iteration         9600 MCMCOBJ=    372.382513819891     
+    iteration         9700 MCMCOBJ=    371.005990450540     
+    iteration         9800 MCMCOBJ=    374.389226506343     
+    iteration         9900 MCMCOBJ=    372.310212399754     
+    iteration        10000 MCMCOBJ=    368.595196290053     
+    Elapsed estimation  time in seconds:    95.28
+    BURN-IN WAS NOT TESTED FOR CONVERGENCE
+    STATISTICAL PORTION WAS COMPLETED
+    
+    Elapsed covariance  time in seconds:     0.00
+    Elapsed postprocess time in seconds:     0.01
+    Elapsed finaloutput time in seconds:     0.02
+   Done with nonmem execution</so>
+  </job>
+  <job>
+   <do in="/data/IntroBayesNONMEM/model/fxaInhibitAvgBAYES/fxaInhibitAvgBAYES.1">if [ -e fxaInhibitAvgBAYES.1.xml ];then cat fxaInhibitAvgBAYES.1.xml;else echo \&lt;nofile/\>; fi</do>
+   <so>
+    <nm:output xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:nm="http://namespaces.oreilly.com/xmlnut/address" xsi:schemaLocation="http://namespaces.oreilly.com/xmlnut/address output.xsd">
+     <nm:start_datetime>2019-08-23T21:06:28.966</nm:start_datetime>
+     <nm:control_stream>
+     $PROB fxaInhibitAvgBAYES.1 example, Emax model
+     $INPUT C ID DOSE DV CONC EVID CMT
+     $DATA ../../../data/fxaInhAvg.csv     IGNORE=(C='C')
+     
+     $SUBROUTINES OTHER = ../../extrasend.f90
+     
+     $PRED
+     ; Request extra information for Bayesian analysis.
+     ; An extra call will then be made for accepted samples
+     include '/opt/NONMEM/nm74/util/nonmem_reserved_general'
+     BAYES_EXTRA_REQUEST=1
+     
+     nThin = THETA(5)
+     
+     MU_1 = THETA(1)
+     MU_2 = THETA(2)
+     MU_3 = THETA(3)
+     ;MU_4 = THETA(4)
+     
+     " CALL EXTRASEND()
+     
+     LGT_EMAX = MU_1 + ETA(1)
+     
+     EMAX = 100 / (1 + EXP(-LGT_EMAX))
+     EC50 = EXP(MU_2 + ETA(2))
+     GAMMA = MU_3 + ETA(3)
+     SD = EXP(THETA(4))
+     
+     RESP = EMAX * CONC**GAMMA / (EC50**GAMMA + CONC**GAMMA)
+     
+     Y = RESP + SD * ERR(1)
+     
+     IF(BAYES_EXTRA==1 .AND. NIREC==1 .AND. NDREC==1 .AND. &amp;
+          ITER_REPORT > 0 .AND. &amp;
+          ITER_REPORT/nThin == INT(ITER_REPORT/nThin)) THEN
+     IF(FIRST_WRITE_PAR==0) THEN
+     " OPEN(unit=52,FILE='./par.txt')
+         FIRST_WRITE_PAR=1
+       ENDIF
+       " WRITE(52,'(I12,1X,5(1X,1PG19.10E3))') ITER_REPORT, &amp;
+       " THETA(1), THETA(2), THETA(3), THETA(4)
+     ENDIF
+     
+     ; Initial values of THETA
+     $THETA
+     1.90113351653491      ; EMAX = 100 * EXPIT(THETA(1))
+     4.88642265651685  ; EC50 = EXP(THETA(2))
+     (0,  2.31808447966998 )   ; GAMMA = THETA(3)
+     1.87489461956588   ; SD = EXP(THETA(4))
+     (1 FIX)
+     $OMEGA DIAG(3);INITIAL values of OMEGAs
+     (0.0 FIX)
+     (0.0 FIX)
+     (0.0 FIX)
+     $SIGMA ;INITIAL values of SIGMAs
+     (1 FIX)
+     
+     
+     $PRIOR NWPRI
+     $THETAP          ; Prior information of THETAS
+     (0 FIX)      ;  THETA(1) EMAX
+     (5.5 FIX)      ;  THETA(2) EC50
+     (1 FIX)      ;  THETA(3) gamma
+     (2.3 FIX)      ; THETA(4) SD
+     $THETAPV BLOCK(4)     ;  variances for priors on THETAS (var-cov)
+     2.0 FIX ; EMAX almost uniform
+     0.00 1  ; EC50
+     0.00 0.00 1  ; gamma
+     0.00 0.00 0.00 1   ; SD
+     $ESTIMATION
+     METHOD = BAYES INTERACTION LAPLACIAN
+     AUTO= 1
+     CTYPE = 0
+     OLKJDF= 0
+     OVARF= 1
+     NUTS_DELTA= 0.8
+     NBURN = 10000 NITER = 10000 SEED = 7212
+     PRINT = 100 NOABORT FILE = /dev/null
+     $TABLE ID EVID CONC DV PRED
+     NOPRINT ONEHEADER FILE=./fxaInhibitAvgBAYES.1.tab
+     $TABLE ID EMAX EC50 GAMMA SD
+     NOPRINT ONEHEADER FILE=./fxaInhibitAvgBAYES.1par.tab</nm:control_stream>
+     <nm:nmtran>
+     
+      WARNINGS AND ERRORS (IF ANY) FOR PROBLEM    1
+     
+      (WARNING  2) NM-TRAN INFERS THAT THE DATA ARE POPULATION.
+     
+      (WARNING  66) WITH "LAPLACIAN" AND "INTERACTION", "NUMERICAL" AND "SLOW"
+      ARE ALSO REQUIRED ON $ESTIM RECORD. NM-TRAN HAS SUPPLIED THESE OPTIONS.
+     
+      (WARNING  97) A RANDOM QUANTITY IS RAISED TO A POWER. IF THE RESULT AFFECTS
+      THE VALUE OF THE OBJECTIVE FUNCTION, THE USER SHOULD ENSURE THAT THE
+      RANDOM QUANTITY IS NEVER 0 WHEN THE POWER IS &lt; 1.
+     
+      (WARNING  99) A RANDOM QUANTITY IS USED AS A POWER. IF THE RESULT AFFECTS
+      THE VALUE OF THE OBJECTIVE FUNCTION, THE USER SHOULD ENSURE THAT THE
+      QUANTITY RAISED TO THE POWER IS NOT 0.
+     
+      (WARNING  13) WITH USER-WRITTEN PRED OR $PRED, NM-TRAN CANNOT APPEND THE
+      MDV DATA ITEM.
+     
+      (MU_WARNING 20) MU_001: MU_ VARIABLE SHOULD NOT BE DEFINED AFTER VERBATIM CODE.</nm:nmtran>
+     <nm:nonmem nm:version="7.4.3">
+      <nm:license_information>
+      License Registered to: Metrum Research Group
+      Expiration Date:    14 JUL 2020
+      Current Date:       23 AUG 2019
+      Days until program expires : 326</nm:license_information>
+      <nm:program_information>
+      1NONLINEAR MIXED EFFECTS MODEL PROGRAM (NONMEM) VERSION 7.4.3
+       ORIGINALLY DEVELOPED BY STUART BEAL, LEWIS SHEINER, AND ALISON BOECKMANN
+       CURRENT DEVELOPERS ARE ROBERT BAUER, ICON DEVELOPMENT SOLUTIONS,
+       AND ALISON BOECKMANN. IMPLEMENTATION, EFFICIENCY, AND STANDARDIZATION
+       PERFORMED BY NOUS INFOSYSTEMS.</nm:program_information>
+      <nm:theta_lb>
+       <nm:val nm:name="1">-1000000.00000000</nm:val>
+       <nm:val nm:name="2">-1000000.00000000</nm:val>
+       <nm:val nm:name="3">0.000000000000000E+000</nm:val>
+       <nm:val nm:name="4">-1000000.00000000</nm:val>
+       <nm:val nm:name="5">1.00000000000000</nm:val>
+       <nm:val nm:name="6">0.000000000000000E+000</nm:val>
+       <nm:val nm:name="7">5.50000000000000</nm:val>
+       <nm:val nm:name="8">1.00000000000000</nm:val>
+       <nm:val nm:name="9">2.30000000000000</nm:val>
+      </nm:theta_lb>
+      <nm:theta_in>
+       <nm:val nm:name="1">1.90113351653491</nm:val>
+       <nm:val nm:name="2">4.88642265651685</nm:val>
+       <nm:val nm:name="3">2.31808447966998</nm:val>
+       <nm:val nm:name="4">1.87489461956588</nm:val>
+       <nm:val nm:name="5">1.00000000000000</nm:val>
+       <nm:val nm:name="6">0.000000000000000E+000</nm:val>
+       <nm:val nm:name="7">5.50000000000000</nm:val>
+       <nm:val nm:name="8">1.00000000000000</nm:val>
+       <nm:val nm:name="9">2.30000000000000</nm:val>
+      </nm:theta_in>
+      <nm:theta_ub>
+       <nm:val nm:name="1">1000000.00000000</nm:val>
+       <nm:val nm:name="2">1000000.00000000</nm:val>
+       <nm:val nm:name="3">1000000.00000000</nm:val>
+       <nm:val nm:name="4">1000000.00000000</nm:val>
+       <nm:val nm:name="5">1.00000000000000</nm:val>
+       <nm:val nm:name="6">0.000000000000000E+000</nm:val>
+       <nm:val nm:name="7">5.50000000000000</nm:val>
+       <nm:val nm:name="8">1.00000000000000</nm:val>
+       <nm:val nm:name="9">2.30000000000000</nm:val>
+      </nm:theta_ub>
+      <nm:problem nm:number="1" nm:subproblem="0" nm:superproblem1="0" nm:iteration1="0" nm:superproblem2="0" nm:iteration2="0">
+       <nm:problem_title>fxaInhibitAvgBAYES.1 example, Emax model</nm:problem_title>
+       <nm:problem_information>
+       
+        PROBLEM NO.:         1
+        fxaInhibitAvgBAYES.1 example, Emax model
+       0DATA CHECKOUT RUN:              NO
+        DATA SET LOCATED ON UNIT NO.:    2
+        THIS UNIT TO BE REWOUND:        NO
+        NO. OF DATA RECS IN DATA SET:       80
+        NO. OF DATA ITEMS IN DATA SET:   7
+        ID DATA ITEM IS DATA ITEM NO.:   2
+        DEP VARIABLE IS DATA ITEM NO.:   4
+       0LABELS FOR DATA ITEMS:
+        C ID DOSE DV CONC EVID CMT
+       0(NONBLANK) LABELS FOR PRED-DEFINED ITEMS:
+        EMAX EC50 GAMMA SD
+       0FORMAT FOR DATA:
+        (7E6.0)
+       
+        TOT. NO. OF OBS RECS:       80
+        TOT. NO. OF INDIVIDUALS:       80
+       0LENGTH OF THETA:   9
+       0DEFAULT THETA BOUNDARY TEST OMITTED:    NO
+       0OMEGA HAS BLOCK FORM:
+         1
+         0  2
+         0  0  3
+         0  0  0  4
+         0  0  0  4  4
+         0  0  0  4  4  4
+         0  0  0  4  4  4  4
+       0DEFAULT OMEGA BOUNDARY TEST OMITTED:    NO
+       0SIGMA HAS SIMPLE DIAGONAL FORM WITH DIMENSION:   1
+       0DEFAULT SIGMA BOUNDARY TEST OMITTED:    NO
+       0INITIAL ESTIMATE OF THETA:
+        LOWER BOUND    INITIAL EST    UPPER BOUND
+        -0.1000E+07     0.1901E+01     0.1000E+07
+        -0.1000E+07     0.4886E+01     0.1000E+07
+         0.0000E+00     0.2318E+01     0.1000E+07
+        -0.1000E+07     0.1875E+01     0.1000E+07
+         0.1000E+01     0.1000E+01     0.1000E+01
+         0.0000E+00     0.0000E+00     0.0000E+00
+         0.5500E+01     0.5500E+01     0.5500E+01
+         0.1000E+01     0.1000E+01     0.1000E+01
+         0.2300E+01     0.2300E+01     0.2300E+01
+       0INITIAL ESTIMATE OF OMEGA:
+        BLOCK SET NO.   BLOCK                                                                    FIXED
+               1                                                                                  YES
+                         0.0000E+00
+               2                                                                                  YES
+                         0.0000E+00
+               3                                                                                  YES
+                         0.0000E+00
+               4                                                                                  YES
+                         0.2000E+01
+                         0.0000E+00   0.1000E+01
+                         0.0000E+00   0.0000E+00   0.1000E+01
+                         0.0000E+00   0.0000E+00   0.0000E+00   0.1000E+01
+       0INITIAL ESTIMATE OF SIGMA:
+        0.1000E+01
+       0SIGMA CONSTRAINED TO BE THIS INITIAL ESTIMATE
+       0TABLES STEP OMITTED:    NO
+        NO. OF TABLES:           2
+        SEED NUMBER (SEED):    11456
+        RANMETHOD:             3U
+        MC SAMPLES (ESAMPLE):    300
+        WRES SQUARE ROOT TYPE (WRESCHOL): EIGENVALUE
+       0-- TABLE   1 --
+       0RECORDS ONLY:    ALL
+       04 COLUMNS APPENDED:    YES
+        PRINTED:                NO
+        HEADER:                YES
+        FILE TO BE FORWARDED:   NO
+        FORMAT:                S1PE11.4
+        LFORMAT:
+        RFORMAT:
+        FIXED_EFFECT_ETAS:
+       0USER-CHOSEN ITEMS:
+        ID EVID CONC DV
+       0-- TABLE   2 --
+       0RECORDS ONLY:    ALL
+       04 COLUMNS APPENDED:    YES
+        PRINTED:                NO
+        HEADER:                YES
+        FILE TO BE FORWARDED:   NO
+        FORMAT:                S1PE11.4
+        LFORMAT:
+        RFORMAT:
+        FIXED_EFFECT_ETAS:
+       0USER-CHOSEN ITEMS:
+        ID EMAX EC50 GAMMA SD
+       0
+        PRIOR SUBROUTINE USER-SUPPLIED</nm:problem_information>
+       <nm:problem_options nm:data_checkout_run="no" nm:data_unit="2" nm:data_rewind="no" nm:data_nrec="80" nm:data_nitems="7" nm:data_id="2" nm:data_l2="0" nm:data_dv="4" nm:data_mdv="0" nm:data_mrg="0" nm:data_raw="0" nm:data_rpt="0" nm:data_sub_array1="0" nm:data_sub_array2="0" nm:data_sub_array3="0" nm:data_format="(7e6.0)" nm:data_nobs="80" nm:data_nind="80" nm:data_mdv100="0" nm:nthetat="9" nm:theta_bound_test_omitted="no" nm:omega_blockdim="7" nm:omega_bound_test_omitted="no" nm:sigma_diagdim="1" nm:sigma_bound_test_omitted="no" nm:tab_omitted="no" nm:tab_number="2" nm:tab_seed="11456" nm:tab_ranmethod="3u" nm:tab_esample="300" nm:tab_wres="eigenvalue" nm:tab_fixedetas_01="BLANK" nm:tab_fixedetas_02="BLANK"/>
+       <nm:estimation nm:number="1" nm:type="0">
+        <nm:table_series>1</nm:table_series>
+        <nm:estimation_method>mcmc</nm:estimation_method>
+        <nm:estimation_title>MCMC Bayesian Analysis</nm:estimation_title>
+        <nm:estimation_information>
+         ESTIMATION STEP OMITTED:                 NO
+         ANALYSIS TYPE:                           POPULATION
+         NUMBER OF SADDLE POINT RESET ITERATIONS:      0
+         GRADIENT METHOD USED:               SLOW
+         CONDITIONAL ESTIMATES USED:              YES
+         CENTERED ETA:                            NO
+         EPS-ETA INTERACTION:                     YES
+         LAPLACIAN OBJ. FUNC.:                    NO
+         NO. OF FUNCT. EVALS. ALLOWED:            1520
+         NO. OF SIG. FIGURES REQUIRED:            3
+         INTERMEDIATE PRINTOUT:                   YES
+         ESTIMATE OUTPUT TO MSF:                  NO
+         ABORT WITH PRED EXIT CODE 1:             NO
+         IND. OBJ. FUNC. VALUES SORTED:           NO
+         NUMERICAL DERIVATIVE
+               FILE REQUEST (NUMDER):               NONE
+         MAP (ETAHAT) ESTIMATION METHOD (OPTMAP):   0
+         ETA HESSIAN EVALUATION METHOD (ETADER):    0
+         INITIAL ETA FOR MAP ESTIMATION (MCETA):    0
+         SIGDIGITS FOR MAP ESTIMATION (SIGLO):      100
+         GRADIENT SIGDIGITS OF
+               FIXED EFFECTS PARAMETERS (SIGL):     100
+         NOPRIOR SETTING (NOPRIOR):                 OFF
+         NOCOV SETTING (NOCOV):                     OFF
+         DERCONT SETTING (DERCONT):                 OFF
+         FINAL ETA RE-EVALUATION (FNLETA):          ON
+         EXCLUDE NON-INFLUENTIAL (NON-INFL.) ETAS
+               IN SHRINKAGE (ETASTYPE):             NO
+         NON-INFL. ETA CORRECTION (NONINFETA):      OFF
+         RAW OUTPUT FILE (FILE): /dev/null
+         EXCLUDE TITLE (NOTITLE):                   NO
+         EXCLUDE COLUMN LABELS (NOLABEL):           NO
+         FORMAT FOR ADDITIONAL FILES (FORMAT):      S1PE12.5
+         PARAMETER ORDER FOR OUTPUTS (ORDER):       TSOL
+         WISHART PRIOR DF INTERPRETATION (WISHTYPE):0
+         KNUTHSUMOFF:                               0
+         INCLUDE LNTWOPI:                           NO
+         INCLUDE CONSTANT TERM TO PRIOR (PRIORC):   NO
+         INCLUDE CONSTANT TERM TO OMEGA (ETA) (OLNTWOPI):NO
+         EM OR BAYESIAN METHOD USED:                MCMC BAYESIAN (BAYES)
+         MU MODELING PATTERN (MUM):
+         GRADIENT/GIBBS PATTERN (GRD):
+         AUTOMATIC SETTING FEATURE (AUTO):          ON
+         CONVERGENCE TYPE (CTYPE):                  0
+         KEEP ITERATIONS (THIN):            1
+         BURN-IN ITERATIONS (NBURN):                10000
+         ITERATIONS (NITER):                        10000
+         ANEAL SETTING (CONSTRAIN):                 1
+         STARTING SEED FOR MC METHODS (SEED):       7212
+         MC SAMPLES PER SUBJECT (ISAMPLE):          1
+         RANDOM SAMPLING METHOD (RANMETHOD):        3U
+         PROPOSAL DENSITY SCALING RANGE
+                      (ISCALE_MIN, ISCALE_MAX):     1.000000000000000E-06   ,1000000.00000000
+         SAMPLE ACCEPTANCE RATE (IACCEPT):          0.400000000000000
+         METROPOLIS HASTINGS SAMPLING FOR INDIVIDUAL ETAS:
+         SAMPLES FOR GLOBAL SEARCH KERNEL (ISAMPLE_M1):          2
+         SAMPLES FOR NEIGHBOR SEARCH KERNEL (ISAMPLE_M1A):       0
+         SAMPLES FOR MASS/IMP/POST. MATRIX SEARCH (ISAMPLE_M1B): 2
+         SAMPLES FOR LOCAL SEARCH KERNEL (ISAMPLE_M2):           2
+         SAMPLES FOR LOCAL UNIVARIATE KERNEL (ISAMPLE_M3):       2
+         PWR. WT. MASS/IMP/POST MATRIX ACCUM. FOR ETAS (IKAPPA): 1.00000000000000
+         MASS/IMP./POST. MATRIX REFRESH SETTING (MASSREST):      -1
+         METROPOLIS HASTINGS POPULATION SAMPLING FOR NON-GIBBS
+         SAMPLED THETAS AND SIGMAS:
+         PROPOSAL DENSITY SCALING RANGE
+                      (PSCALE_MIN, PSCALE_MAX):   1.000000000000000E-02   ,1000.00000000000
+         SAMPLE ACCEPTANCE RATE (PACCEPT):                       0.500000000000000
+         SAMPLES FOR GLOBAL SEARCH KERNEL (PSAMPLE_M1):          1
+         SAMPLES FOR LOCAL SEARCH KERNEL (PSAMPLE_M2):           4
+         SAMPLES FOR LOCAL UNIVARIATE KERNEL (PSAMPLE_M3):       1
+         METROPOLIS HASTINGS POPULATION SAMPLING FOR NON-GIBBS
+         SAMPLED OMEGAS:
+         SAMPLE ACCEPTANCE RATE (OACCEPT):                       0.500000000000000
+         SAMPLES FOR GLOBAL SEARCH KERNEL (OSAMPLE_M1):          -1
+         SAMPLES FOR LOCAL SEARCH KERNEL (OSAMPLE_M2):           0
+         SAMPLES FOR LOCAL UNIVARIATE SEARCH KERNEL (OSAMPLE_M3):0
+         DEG. FR. FOR T DIST.  PRIOR FOR THETAS (TTDF):        0.00000000000000
+         DEG. FR. FOR LKJ CORRELATION PRIOR FOR OMEGAS (OLKJDF): 0.00000000000000
+         WEIGHT FACTOR FOR STD PRIOR FOR OMEGAS (OVARF): 1.00000000000000
+         DEG. FR. FOR LKJ CORRELATION PRIOR FOR SIGMAS (SLKJDF): 0.00000000000000
+         WEIGHT FACTOR FOR STD PRIOR FOR SIGMAS (SVARF): 1.00000000000000
+        </nm:estimation_information>
+        <nm:estimation_options nm:estim_omitted="no" nm:analysis_type="pop" nm:saddle_reset="0" nm:saddle_hess="0" nm:slow_gradient="slow" nm:cond_estim="yes" nm:centered_eta="no" nm:epseta_interaction="yes" nm:laplace="yes" nm:predflag="0" nm:maxfn="1520" nm:nsig="3" nm:msfo="no" nm:abort="no" nm:objsort="no" nm:numder="0" nm:optmap="0" nm:etader="0" nm:mceta="0" nm:siglo="100" nm:sigl="100" nm:noprior="0" nm:nocov="0" nm:dercont="0" nm:atol="0" nm:fnleta="1" nm:etastype="0" nm:noninfeta="0" nm:file="/dev/null" nm:notitle="0" nm:nolabel="0" nm:format="s1pe12.5" nm:order="tsol" nm:wishtype="0" nm:knuthsumoff="0" nm:lntwopi="0" nm:priorc="0" nm:olntwopi="0" nm:estimation_method="bayes" nm:nuts_type="none" nm:mum="BLANK" nm:grd="BLANK" nm:auto="1" nm:ctype="0" nm:thin="1" nm:nburn="10000" nm:niter="10000" nm:constrain="1" nm:anneal="BLANK" nm:seed="7212" nm:isample="1" nm:ranmethod="3u" nm:iscale_min="1.000000000000000E-06" nm:iscale_max="1000000.00000000" nm:iaccept="0.400000000000000" nm:isample_m1="2" nm:isample_m1a="0" nm:isample_m1b="2" nm:isample_m2="2" nm:isample_m3="2" nm:ikappa="1.00000000000000" nm:massreset="-1" nm:pscale_min="1.000000000000000E-02" nm:pscale_max="1000.00000000000" nm:paccept="0.500000000000000" nm:psample_m1="1" nm:psample_m2="4" nm:psample_m3="1" nm:oaccept="0.500000000000000" nm:osample_m1="-1" nm:osample_m2="0" nm:osample_m3="0" nm:ttdf="0.00000000000000" nm:olkjdf="0.00000000000000" nm:ovarf="1.00000000000000" nm:slkjdf="0.00000000000000" nm:svarf="1.00000000000000"/>
+        <nm:monitor>
+         <nm:obj nm:iteration="-10000">600.784048717327</nm:obj>
+         <nm:obj nm:iteration="-9900">380.143536948164</nm:obj>
+         <nm:obj nm:iteration="-9800">371.610153669795</nm:obj>
+         <nm:obj nm:iteration="-9700">372.208523380618</nm:obj>
+         <nm:obj nm:iteration="-9600">368.509250560253</nm:obj>
+         <nm:obj nm:iteration="-9500">369.324461068313</nm:obj>
+         <nm:obj nm:iteration="-9400">373.954089603176</nm:obj>
+         <nm:obj nm:iteration="-9300">368.884101006072</nm:obj>
+         <nm:obj nm:iteration="-9200">370.494343260782</nm:obj>
+         <nm:obj nm:iteration="-9100">368.527831816190</nm:obj>
+         <nm:obj nm:iteration="-9000">372.092865058959</nm:obj>
+         <nm:obj nm:iteration="-8900">376.551939896274</nm:obj>
+         <nm:obj nm:iteration="-8800">368.407327644416</nm:obj>
+         <nm:obj nm:iteration="-8700">369.987505381174</nm:obj>
+         <nm:obj nm:iteration="-8600">370.778634445755</nm:obj>
+         <nm:obj nm:iteration="-8500">369.796991955276</nm:obj>
+         <nm:obj nm:iteration="-8400">373.969050123336</nm:obj>
+         <nm:obj nm:iteration="-8300">369.835127265363</nm:obj>
+         <nm:obj nm:iteration="-8200">376.727420406265</nm:obj>
+         <nm:obj nm:iteration="-8100">370.171910321052</nm:obj>
+         <nm:obj nm:iteration="-8000">374.295634291694</nm:obj>
+         <nm:obj nm:iteration="-7900">371.495026566162</nm:obj>
+         <nm:obj nm:iteration="-7800">368.219801186538</nm:obj>
+         <nm:obj nm:iteration="-7700">371.375304616917</nm:obj>
+         <nm:obj nm:iteration="-7600">370.328661173118</nm:obj>
+         <nm:obj nm:iteration="-7500">369.522216880126</nm:obj>
+         <nm:obj nm:iteration="-7400">369.588202149651</nm:obj>
+         <nm:obj nm:iteration="-7300">367.282576081793</nm:obj>
+         <nm:obj nm:iteration="-7200">372.332306299172</nm:obj>
+         <nm:obj nm:iteration="-7100">371.879302279411</nm:obj>
+         <nm:obj nm:iteration="-7000">367.976161555391</nm:obj>
+         <nm:obj nm:iteration="-6900">371.650834192760</nm:obj>
+         <nm:obj nm:iteration="-6800">368.270853535593</nm:obj>
+         <nm:obj nm:iteration="-6700">370.863245927449</nm:obj>
+         <nm:obj nm:iteration="-6600">368.048412282444</nm:obj>
+         <nm:obj nm:iteration="-6500">376.688135354554</nm:obj>
+         <nm:obj nm:iteration="-6400">370.224531475762</nm:obj>
+         <nm:obj nm:iteration="-6300">374.270890614949</nm:obj>
+         <nm:obj nm:iteration="-6200">367.454842043856</nm:obj>
+         <nm:obj nm:iteration="-6100">370.540456038572</nm:obj>
+         <nm:obj nm:iteration="-6000">370.283121377427</nm:obj>
+         <nm:obj nm:iteration="-5900">370.509299094434</nm:obj>
+         <nm:obj nm:iteration="-5800">367.312536014769</nm:obj>
+         <nm:obj nm:iteration="-5700">369.139719895859</nm:obj>
+         <nm:obj nm:iteration="-5600">367.166266831439</nm:obj>
+         <nm:obj nm:iteration="-5500">374.304204790874</nm:obj>
+         <nm:obj nm:iteration="-5400">375.089304013629</nm:obj>
+         <nm:obj nm:iteration="-5300">369.744869164729</nm:obj>
+         <nm:obj nm:iteration="-5200">380.179907538003</nm:obj>
+         <nm:obj nm:iteration="-5100">368.445258161609</nm:obj>
+         <nm:obj nm:iteration="-5000">373.570046186410</nm:obj>
+         <nm:obj nm:iteration="-4900">368.791721577639</nm:obj>
+         <nm:obj nm:iteration="-4800">367.853682396357</nm:obj>
+         <nm:obj nm:iteration="-4700">371.594642138944</nm:obj>
+         <nm:obj nm:iteration="-4600">369.486748155560</nm:obj>
+         <nm:obj nm:iteration="-4500">374.703572262379</nm:obj>
+         <nm:obj nm:iteration="-4400">367.842303405287</nm:obj>
+         <nm:obj nm:iteration="-4300">374.664265003478</nm:obj>
+         <nm:obj nm:iteration="-4200">377.211991115053</nm:obj>
+         <nm:obj nm:iteration="-4100">368.489839859355</nm:obj>
+         <nm:obj nm:iteration="-4000">371.359045682944</nm:obj>
+         <nm:obj nm:iteration="-3900">368.234947249463</nm:obj>
+         <nm:obj nm:iteration="-3800">370.445607794642</nm:obj>
+         <nm:obj nm:iteration="-3700">371.017443208320</nm:obj>
+         <nm:obj nm:iteration="-3600">369.053432957579</nm:obj>
+         <nm:obj nm:iteration="-3500">372.121628291176</nm:obj>
+         <nm:obj nm:iteration="-3400">368.600458241003</nm:obj>
+         <nm:obj nm:iteration="-3300">368.233973342276</nm:obj>
+         <nm:obj nm:iteration="-3200">379.418018819300</nm:obj>
+         <nm:obj nm:iteration="-3100">371.244335329911</nm:obj>
+         <nm:obj nm:iteration="-3000">368.636843214304</nm:obj>
+         <nm:obj nm:iteration="-2900">386.695175491275</nm:obj>
+         <nm:obj nm:iteration="-2800">367.330511493966</nm:obj>
+         <nm:obj nm:iteration="-2700">370.058434621728</nm:obj>
+         <nm:obj nm:iteration="-2600">367.856339855776</nm:obj>
+         <nm:obj nm:iteration="-2500">372.850194571262</nm:obj>
+         <nm:obj nm:iteration="-2400">372.228101100029</nm:obj>
+         <nm:obj nm:iteration="-2300">367.636175230656</nm:obj>
+         <nm:obj nm:iteration="-2200">372.709242757476</nm:obj>
+         <nm:obj nm:iteration="-2100">369.974423871108</nm:obj>
+         <nm:obj nm:iteration="-2000">369.948047576593</nm:obj>
+         <nm:obj nm:iteration="-1900">369.928459827311</nm:obj>
+         <nm:obj nm:iteration="-1800">368.909339667014</nm:obj>
+         <nm:obj nm:iteration="-1700">369.910091674717</nm:obj>
+         <nm:obj nm:iteration="-1600">369.753368666940</nm:obj>
+         <nm:obj nm:iteration="-1500">367.947995054088</nm:obj>
+         <nm:obj nm:iteration="-1400">371.971124532115</nm:obj>
+         <nm:obj nm:iteration="-1300">367.857026600929</nm:obj>
+         <nm:obj nm:iteration="-1200">368.148729057882</nm:obj>
+         <nm:obj nm:iteration="-1100">369.160452613305</nm:obj>
+         <nm:obj nm:iteration="-1000">370.228780325561</nm:obj>
+         <nm:obj nm:iteration="-900">374.010487490773</nm:obj>
+         <nm:obj nm:iteration="-800">371.192520816386</nm:obj>
+         <nm:obj nm:iteration="-700">375.885935438766</nm:obj>
+         <nm:obj nm:iteration="-600">367.126877806908</nm:obj>
+         <nm:obj nm:iteration="-500">372.996236068444</nm:obj>
+         <nm:obj nm:iteration="-400">369.103790874486</nm:obj>
+         <nm:obj nm:iteration="-300">371.017543760797</nm:obj>
+         <nm:obj nm:iteration="-200">374.118127755348</nm:obj>
+         <nm:obj nm:iteration="-100">370.764393535209</nm:obj>
+         <nm:obj nm:iteration="0">368.512353449945</nm:obj>
+         <nm:obj nm:iteration="100">369.255116686596</nm:obj>
+         <nm:obj nm:iteration="200">371.456999129345</nm:obj>
+         <nm:obj nm:iteration="300">374.988330155189</nm:obj>
+         <nm:obj nm:iteration="400">371.656962837656</nm:obj>
+         <nm:obj nm:iteration="500">377.838287995176</nm:obj>
+         <nm:obj nm:iteration="600">372.264596395567</nm:obj>
+         <nm:obj nm:iteration="700">372.101680834613</nm:obj>
+         <nm:obj nm:iteration="800">372.107060094301</nm:obj>
+         <nm:obj nm:iteration="900">374.165551552157</nm:obj>
+         <nm:obj nm:iteration="1000">377.450687487502</nm:obj>
+         <nm:obj nm:iteration="1100">371.834946097476</nm:obj>
+         <nm:obj nm:iteration="1200">368.236267458539</nm:obj>
+         <nm:obj nm:iteration="1300">368.761748476491</nm:obj>
+         <nm:obj nm:iteration="1400">371.531127769461</nm:obj>
+         <nm:obj nm:iteration="1500">370.875448102868</nm:obj>
+         <nm:obj nm:iteration="1600">369.405492107364</nm:obj>
+         <nm:obj nm:iteration="1700">372.809941996599</nm:obj>
+         <nm:obj nm:iteration="1800">372.087053127326</nm:obj>
+         <nm:obj nm:iteration="1900">370.388596843207</nm:obj>
+         <nm:obj nm:iteration="2000">374.714377443598</nm:obj>
+         <nm:obj nm:iteration="2100">370.115239510987</nm:obj>
+         <nm:obj nm:iteration="2200">373.561774507387</nm:obj>
+         <nm:obj nm:iteration="2300">376.794690254378</nm:obj>
+         <nm:obj nm:iteration="2400">370.656375149281</nm:obj>
+         <nm:obj nm:iteration="2500">375.985252181475</nm:obj>
+         <nm:obj nm:iteration="2600">370.552242259113</nm:obj>
+         <nm:obj nm:iteration="2700">370.100572820368</nm:obj>
+         <nm:obj nm:iteration="2800">369.754849324757</nm:obj>
+         <nm:obj nm:iteration="2900">371.059397362809</nm:obj>
+         <nm:obj nm:iteration="3000">372.261986859492</nm:obj>
+         <nm:obj nm:iteration="3100">368.707004539331</nm:obj>
+         <nm:obj nm:iteration="3200">368.393154387405</nm:obj>
+         <nm:obj nm:iteration="3300">371.639245642206</nm:obj>
+         <nm:obj nm:iteration="3400">369.823028746258</nm:obj>
+         <nm:obj nm:iteration="3500">367.168668918051</nm:obj>
+         <nm:obj nm:iteration="3600">368.615050059718</nm:obj>
+         <nm:obj nm:iteration="3700">369.882012409014</nm:obj>
+         <nm:obj nm:iteration="3800">368.266746107202</nm:obj>
+         <nm:obj nm:iteration="3900">368.917134890606</nm:obj>
+         <nm:obj nm:iteration="4000">370.660818942883</nm:obj>
+         <nm:obj nm:iteration="4100">369.058118419209</nm:obj>
+         <nm:obj nm:iteration="4200">369.373365518592</nm:obj>
+         <nm:obj nm:iteration="4300">374.421375778233</nm:obj>
+         <nm:obj nm:iteration="4400">370.744432675022</nm:obj>
+         <nm:obj nm:iteration="4500">370.176597434925</nm:obj>
+         <nm:obj nm:iteration="4600">379.287369881394</nm:obj>
+         <nm:obj nm:iteration="4700">368.048820236640</nm:obj>
+         <nm:obj nm:iteration="4800">370.443824280970</nm:obj>
+         <nm:obj nm:iteration="4900">369.115750379824</nm:obj>
+         <nm:obj nm:iteration="5000">368.249954026162</nm:obj>
+         <nm:obj nm:iteration="5100">368.963368709532</nm:obj>
+         <nm:obj nm:iteration="5200">369.301992921012</nm:obj>
+         <nm:obj nm:iteration="5300">369.608188336739</nm:obj>
+         <nm:obj nm:iteration="5400">377.619087257537</nm:obj>
+         <nm:obj nm:iteration="5500">371.646922025269</nm:obj>
+         <nm:obj nm:iteration="5600">367.812822123415</nm:obj>
+         <nm:obj nm:iteration="5700">374.143734086483</nm:obj>
+         <nm:obj nm:iteration="5800">369.162342343856</nm:obj>
+         <nm:obj nm:iteration="5900">368.637951051866</nm:obj>
+         <nm:obj nm:iteration="6000">367.929570423086</nm:obj>
+         <nm:obj nm:iteration="6100">371.075085985281</nm:obj>
+         <nm:obj nm:iteration="6200">368.620708041112</nm:obj>
+         <nm:obj nm:iteration="6300">374.789990692740</nm:obj>
+         <nm:obj nm:iteration="6400">375.744548264580</nm:obj>
+         <nm:obj nm:iteration="6500">374.700542502837</nm:obj>
+         <nm:obj nm:iteration="6600">377.676195283645</nm:obj>
+         <nm:obj nm:iteration="6700">373.418599912352</nm:obj>
+         <nm:obj nm:iteration="6800">367.896422202866</nm:obj>
+         <nm:obj nm:iteration="6900">367.383274887824</nm:obj>
+         <nm:obj nm:iteration="7000">369.477618973307</nm:obj>
+         <nm:obj nm:iteration="7100">369.483169645448</nm:obj>
+         <nm:obj nm:iteration="7200">369.651118754960</nm:obj>
+         <nm:obj nm:iteration="7300">370.672891189355</nm:obj>
+         <nm:obj nm:iteration="7400">369.405639851255</nm:obj>
+         <nm:obj nm:iteration="7500">369.479026039385</nm:obj>
+         <nm:obj nm:iteration="7600">368.396101952498</nm:obj>
+         <nm:obj nm:iteration="7700">369.563544459014</nm:obj>
+         <nm:obj nm:iteration="7800">372.038293629684</nm:obj>
+         <nm:obj nm:iteration="7900">366.877245351050</nm:obj>
+         <nm:obj nm:iteration="8000">376.733153162570</nm:obj>
+         <nm:obj nm:iteration="8100">370.249820178825</nm:obj>
+         <nm:obj nm:iteration="8200">367.421296745165</nm:obj>
+         <nm:obj nm:iteration="8300">373.166685249400</nm:obj>
+         <nm:obj nm:iteration="8400">367.572088221429</nm:obj>
+         <nm:obj nm:iteration="8500">369.795375008588</nm:obj>
+         <nm:obj nm:iteration="8600">371.410246860548</nm:obj>
+         <nm:obj nm:iteration="8700">371.437814802136</nm:obj>
+         <nm:obj nm:iteration="8800">367.567567137277</nm:obj>
+         <nm:obj nm:iteration="8900">371.605261674153</nm:obj>
+         <nm:obj nm:iteration="9000">370.031389042279</nm:obj>
+         <nm:obj nm:iteration="9100">370.512438278978</nm:obj>
+         <nm:obj nm:iteration="9200">377.889455221398</nm:obj>
+         <nm:obj nm:iteration="9300">371.470971438774</nm:obj>
+         <nm:obj nm:iteration="9400">370.366008794660</nm:obj>
+         <nm:obj nm:iteration="9500">368.188322288237</nm:obj>
+         <nm:obj nm:iteration="9600">372.382513819891</nm:obj>
+         <nm:obj nm:iteration="9700">371.005990450540</nm:obj>
+         <nm:obj nm:iteration="9800">374.389226506343</nm:obj>
+         <nm:obj nm:iteration="9900">372.310212399754</nm:obj>
+         <nm:obj nm:iteration="10000">368.595196290053</nm:obj>
+        </nm:monitor>
+        <nm:termination_status>2</nm:termination_status>
+        <nm:termination_information>
+         BURN-IN WAS NOT TESTED FOR CONVERGENCE
+         STATISTICAL PORTION WAS COMPLETED</nm:termination_information>
+        <nm:estimation_elapsed_time>95.28</nm:estimation_elapsed_time>
+        <nm:covariance_status nm:error="0" nm:numnegeigenvalues="-1" nm:mineigenvalue="0.000000000000000E+000" nm:maxeigenvalue="0.000000000000000E+000" nm:rms="0.000000000000000E+000"/>
+        <nm:covariance_elapsed_time>0.00</nm:covariance_elapsed_time>
+        <nm:final_objective_function_text>AVERAGE VALUE OF LIKELIHOOD FUNCTION</nm:final_objective_function_text>
+        <nm:final_objective_function>370.857623038948</nm:final_objective_function>
+        <nm:final_objective_function_std>2.82438869798415</nm:final_objective_function_std>
+        <nm:theta>
+         <nm:val nm:name="1">2.03795322479067</nm:val>
+         <nm:val nm:name="2">4.69188625849349</nm:val>
+         <nm:val nm:name="3">1.03794963062182</nm:val>
+         <nm:val nm:name="4">1.80248388010133</nm:val>
+         <nm:val nm:name="5">1.00000000000000</nm:val>
+        </nm:theta>
+        <nm:omega>
+         <nm:row nm:rname="1">
+          <nm:col nm:cname="1">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="2">
+          <nm:col nm:cname="1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="2">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="3">
+          <nm:col nm:cname="1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="3">0.000000000000000E+000</nm:col>
+         </nm:row>
+        </nm:omega>
+        <nm:sigma>
+         <nm:row nm:rname="1">
+          <nm:col nm:cname="1">1.00000000000000</nm:col>
+         </nm:row>
+        </nm:sigma>
+        <nm:omegac>
+         <nm:row nm:rname="1">
+          <nm:col nm:cname="1">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="2">
+          <nm:col nm:cname="1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="2">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="3">
+          <nm:col nm:cname="1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="3">0.000000000000000E+000</nm:col>
+         </nm:row>
+        </nm:omegac>
+        <nm:sigmac>
+         <nm:row nm:rname="1">
+          <nm:col nm:cname="1">1.00000000000000</nm:col>
+         </nm:row>
+        </nm:sigmac>
+        <nm:thetase>
+         <nm:val nm:name="1">0.629261443060543</nm:val>
+         <nm:val nm:name="2">0.147598688552066</nm:val>
+         <nm:val nm:name="3">8.908106642230081E-002</nm:val>
+         <nm:val nm:name="4">7.928006839058301E-002</nm:val>
+         <nm:val nm:name="5">0.000000000000000E+000</nm:val>
+        </nm:thetase>
+        <nm:omegase>
+         <nm:row nm:rname="1">
+          <nm:col nm:cname="1">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="2">
+          <nm:col nm:cname="1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="2">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="3">
+          <nm:col nm:cname="1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="3">0.000000000000000E+000</nm:col>
+         </nm:row>
+        </nm:omegase>
+        <nm:sigmase>
+         <nm:row nm:rname="1">
+          <nm:col nm:cname="1">0.000000000000000E+000</nm:col>
+         </nm:row>
+        </nm:sigmase>
+        <nm:omegacse>
+         <nm:row nm:rname="1">
+          <nm:col nm:cname="1">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="2">
+          <nm:col nm:cname="1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="2">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="3">
+          <nm:col nm:cname="1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="3">0.000000000000000E+000</nm:col>
+         </nm:row>
+        </nm:omegacse>
+        <nm:sigmacse>
+         <nm:row nm:rname="1">
+          <nm:col nm:cname="1">0.000000000000000E+000</nm:col>
+         </nm:row>
+        </nm:sigmacse>
+        <nm:covariance>
+         <nm:row nm:rname="THETA1">
+          <nm:col nm:cname="THETA1">0.395969963722637</nm:col>
+         </nm:row>
+         <nm:row nm:rname="THETA2">
+          <nm:col nm:cname="THETA1">8.452745104032656E-002</nm:col>
+          <nm:col nm:cname="THETA2">2.178537286228966E-002</nm:col>
+         </nm:row>
+         <nm:row nm:rname="THETA3">
+          <nm:col nm:cname="THETA1">-3.770816638908327E-002</nm:col>
+          <nm:col nm:cname="THETA2">-9.618945844472182E-003</nm:col>
+          <nm:col nm:cname="THETA3">7.935436394934367E-003</nm:col>
+         </nm:row>
+         <nm:row nm:rname="THETA4">
+          <nm:col nm:cname="THETA1">-1.749184229764069E-003</nm:col>
+          <nm:col nm:cname="THETA2">-2.915373997515417E-004</nm:col>
+          <nm:col nm:cname="THETA3">8.442662148845557E-005</nm:col>
+          <nm:col nm:cname="THETA4">6.285329244015520E-003</nm:col>
+         </nm:row>
+         <nm:row nm:rname="THETA5">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="OMEGA(1,1)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="OMEGA(1,2)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,2)">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="OMEGA(1,3)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,3)">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="OMEGA(2,2)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,2)">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="OMEGA(2,3)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,3)">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="OMEGA(3,3)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(3,3)">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="SIGMA(1,1)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(3,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="SIGMA(1,1)">0.000000000000000E+000</nm:col>
+         </nm:row>
+        </nm:covariance>
+        <nm:correlation>
+         <nm:row nm:rname="THETA1">
+          <nm:col nm:cname="THETA1">0.629261443060543</nm:col>
+         </nm:row>
+         <nm:row nm:rname="THETA2">
+          <nm:col nm:cname="THETA1">0.910089601533497</nm:col>
+          <nm:col nm:cname="THETA2">0.147598688552066</nm:col>
+         </nm:row>
+         <nm:row nm:rname="THETA3">
+          <nm:col nm:cname="THETA1">-0.672696062097765</nm:col>
+          <nm:col nm:cname="THETA2">-0.731576208561908</nm:col>
+          <nm:col nm:cname="THETA3">8.908106642230081E-002</nm:col>
+         </nm:row>
+         <nm:row nm:rname="THETA4">
+          <nm:col nm:cname="THETA1">-3.506230111756861E-002</nm:col>
+          <nm:col nm:cname="THETA2">-2.491424673621363E-002</nm:col>
+          <nm:col nm:cname="THETA3">1.195446064944719E-002</nm:col>
+          <nm:col nm:cname="THETA4">7.928006839058301E-002</nm:col>
+         </nm:row>
+         <nm:row nm:rname="THETA5">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="OMEGA(1,1)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="OMEGA(1,2)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,2)">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="OMEGA(1,3)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,3)">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="OMEGA(2,2)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,2)">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="OMEGA(2,3)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,3)">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="OMEGA(3,3)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(3,3)">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="SIGMA(1,1)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(3,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="SIGMA(1,1)">0.000000000000000E+000</nm:col>
+         </nm:row>
+        </nm:correlation>
+        <nm:invcovariance>
+         <nm:row nm:rname="THETA1">
+          <nm:col nm:cname="THETA1">14.7274497380693</nm:col>
+         </nm:row>
+         <nm:row nm:rname="THETA2">
+          <nm:col nm:cname="THETA1">-56.4338397380057</nm:col>
+          <nm:col nm:cname="THETA2">315.061385541118</nm:col>
+         </nm:row>
+         <nm:row nm:rname="THETA3">
+          <nm:col nm:cname="THETA1">1.56107522483391</nm:col>
+          <nm:col nm:cname="THETA2">113.763492493938</nm:col>
+          <nm:col nm:cname="THETA3">271.311563865110</nm:col>
+         </nm:row>
+         <nm:row nm:rname="THETA4">
+          <nm:col nm:cname="THETA1">1.46001128467147</nm:col>
+          <nm:col nm:cname="THETA2">-2.61969931450211</nm:col>
+          <nm:col nm:cname="THETA3">2.06687696711835</nm:col>
+          <nm:col nm:cname="THETA4">159.357696321549</nm:col>
+         </nm:row>
+         <nm:row nm:rname="THETA5">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="OMEGA(1,1)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="OMEGA(1,2)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,2)">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="OMEGA(1,3)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,3)">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="OMEGA(2,2)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,2)">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="OMEGA(2,3)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,3)">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="OMEGA(3,3)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(3,3)">0.000000000000000E+000</nm:col>
+         </nm:row>
+         <nm:row nm:rname="SIGMA(1,1)">
+          <nm:col nm:cname="THETA1">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA2">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA3">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA4">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="THETA5">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,1)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(1,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,2)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(2,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="OMEGA(3,3)">0.000000000000000E+000</nm:col>
+          <nm:col nm:cname="SIGMA(1,1)">0.000000000000000E+000</nm:col>
+         </nm:row>
+        </nm:invcovariance>
+       </nm:estimation>
+       <nm:post_process_times>
+        <nm:post_elapsed_time>0.01</nm:post_elapsed_time>
+        <nm:finaloutput_elapsed_time>0.02</nm:finaloutput_elapsed_time>
+       </nm:post_process_times>
+      </nm:problem>
+     </nm:nonmem>
+     <nm:stop_datetime>2019-08-23T21:08:04.296</nm:stop_datetime>
+     <nm:total_cputime>94.375</nm:total_cputime>
+    </nm:output>
+   </so>
+  </job>
+  <job>
+   <do>cat /opt/NONMEM/nm74/nmqual/log.xml</do>
+   <so>
+    <log>
+     <logged on="install">
+      <config>
+       <!--Linux / Darwin with ifort compile opts for cross-platform reproducibility.-->
+       <alias id="folder">/mnt/nm743CD</alias>
+       <alias id="target">/opt/NONMEM/nm74</alias>
+       <alias id="origin">/mnt/nmqual-8.4.0</alias>
+       <alias id="unlock">/etc/chef/cookbooks/ifort-nonmem/files/default/nonmem.lic</alias>
+       <alias id="mpicha">/usr/local/mpich3/lib/libmpich.a</alias>
+       <!--The meta interface groups commands that collect metadata.-->
+       <do on="meta">pwd</do>
+       <do on="meta">date</do>
+       <do on="meta">perl -e 'use POSIX; print join qq(,),uname'</do>
+       <do on="meta">echo $SHELL</do>
+       <do on="meta">echo $USER</do>
+       <do on="meta">echo $PATH</do>
+       <do on="meta">head -n 5 target/util/nmfe74</do>
+       <do on="meta">which ifort</do>
+       <!--The 'install' interface installs NONMEM.-->
+       <do on="install">date</do>
+       <do on="install">rm -rf origin/temp</do>
+       <do on="install">mkdir origin/temp</do>
+       <do on="install">cp -r folder/* origin/temp</do>
+       <do on="install" in="origin">patch -p0 temp/SETUP74 nix/setup74.diff</do>
+       <!--alters compile options in setup73-->
+       <do on="install">rm -rf target</do>
+       <do on="install">mkdir target</do>
+       <do on="install" in="origin/temp">pwd</do>
+       <do on="install" in="origin/temp">ifort --version</do>
+       <do on="install" in="origin/temp">/bin/bash SETUP74 origin/temp target ifort y ar same rec q unzip nonmem74e.zip nonmem74r.zip</do>
+       <do on="install">mkdir target/nmqual</do>
+       <do on="install">mkdir target/nmqual/doc</do>
+       <do on="install">cp $0 target/nmqual</do>
+       <!--runtime copy of autolog.pl, uses nmqual/log.xml as config-->
+       <do on="install">cp -r origin/con target/nmqual</do>
+       <!--support for processing xml docs-->
+       <do on="install">cp -r origin/csv target/nmqual</do>
+       <!--support for processing csv docs-->
+       <do on="install">cp origin/doc/nix/* target/nmqual/doc</do>
+       <!--reference modeling results-->
+       <do on="install">cp -r origin/psn target/nmqual</do>
+       <!--support for psn qualification-->
+       <do on="install">cp origin/nix/setup74.diff target/nmqual/doc</do>
+       <!--keep for archival purposes-->
+       <do on="install">cp origin/temp/SETUP74 target/nmqual/doc</do>
+       <!--keep for archival purposes-->
+       <do on="install">rm -rf origin/temp</do>
+       <do on="install">cp -r origin/test target/nmqual</do>
+       <!--supports control tests-->
+       <do on="install">chmod 0777 target/license/nonmem.lic</do>
+       <!--enable overwriting-->
+       <do on="install">cp unlock target/license/nonmem.lic</do>
+       <!--replace expired license-->
+       <do on="install">cp mpicha target/mpi/mpi_lini</do>
+       <!--replace default mpich archive-->
+       <!--patch util/nmfe73 and run/nmfe73 to accept compile/execute option-->
+       <do on="install">cp target/util/nmfe74 target/util/nmfe74.old</do>
+       <do on="install">cp target/util/nmfe74 target/run/nmfe74.old</do>
+       <do on="install">patch -p0 -R target/util/nmfe74 nix/nmfe74.diff</do>
+       <do on="install">patch -p0 -R target/run/nmfe74 nix/nmfe74.diff</do>
+       <do on="install" as="xml">perl $0 $_0 meta</do>
+       <to on="install">target/nmqual/log.xml</to>
+       <!--The 'basic' interface does not expect a compile/execute argument (nmfe73-as-modified no longer requires it).-->
+       <!--Run directory and run name are required arguments.-->
+       <do on="basic" as="xml">perl $0 $_0 meta</do>
+       <do on="basic" in="$_1">target/util/nmfe74 $_2.ctl $_2.lst</do>
+       <do on="basic" in="$_1" as="xml">if [ -e $_2.xml ];then cat $_2.xml;else echo \&lt;nofile/\>; fi</do>
+       <do on="basic" as="xml">cat target/nmqual/log.xml</do>
+       <to on="basic">$_1/$_2.log.xml</to>
+       <!--The 'run' interface expects a leading compile/execute argument.-->
+       <do on="run" as="xml">perl $0 $_0 meta</do>
+       <do on="run" in="$_2">target/util/nmfe74 $_1 $_3.ctl $_3.lst</do>
+       <do on="run" in="$_2" as="xml">if [ -e $_3.xml ];then cat $_3.xml;else echo \&lt;nofile/\>; fi</do>
+       <do on="run" as="xml">cat target/nmqual/log.xml</do>
+       <to on="run">$_2/$_3.log.xml</to>
+       <!--The 'para' interface additionally expects [run].pnm to be present in the run directory.-->
+       <do on="para" as="xml">perl $0 $_0 meta</do>
+       <do on="para" in="$_2">target/util/nmfe74 $_1 $_3.ctl $_3.lst -parafile=$_3.pnm</do>
+       <do on="para" in="$_2" as="xml">if [ -e $_3.xml ];then cat $_3.xml;else echo \&lt;nofile/\>; fi</do>
+       <do on="para" as="xml">cat target/nmqual/log.xml</do>
+       <to on="para">$_2/$_3.log.xml</to>
+       <!--The 'test' interface invokes nmfe directly, without the compile/execute argument.-->
+       <do on="test" in="target/nmqual/test">target/util/nmfe74 $_1.ctl $_1.lst</do>
+       <do on="test" in="target/nmqual/test" as="xml">cat $_1.xml</do>
+       <!--The 'qualify' interface runs a full suite of qualification tests.-->
+       <do on="qualify" as="xml">perl $0 $_0 meta</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 3</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 4</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 5</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 6</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 7</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 8</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test example5</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test example6</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test example7</do>
+       <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test example10</do>
+       <do on="qualify" as="xml">cat target/nmqual/log.xml</do>
+       <to on="qualify">$_1</to>
+       <!--The 'regress' interface runs a reduced suite of tests quickly, e.g. for regression testing.-->
+       <do on="regress" as="xml">perl $0 $_0 meta</do>
+       <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 3</do>
+       <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 4</do>
+       <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 5</do>
+       <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 6</do>
+       <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 7</do>
+       <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 8</do>
+       <do on="regress" as="xml">cat target/nmqual/log.xml</do>
+       <to on="regress">$_1</to>
+       <!--The 'psntest' interface runs PsN control tests.-->
+       <do on="psntest" as="xml">perl $0 $_0 meta</do>
+       <do on="psntest" in="target/nmqual/psn">execute -directory=runs -seed=1 TST33611.nmctl TST33612.nmctl TST33613.nmctl</do>
+       <do on="psntest" in="target/nmqual/psn">bootstrap -samples=20 -dir=boot -seed=1 TST3362.nmctl</do>
+       <do on="psntest" in="target/nmqual/psn/runs" as="xml">perl target/nmqual/csv/csv2xml.pl raw_results_TST33611.csv</do>
+       <do on="psntest" in="target/nmqual/psn/boot" as="xml">perl target/nmqual/csv/csv2xml.pl raw_results_TST3362.csv</do>
+       <do on="psntest" in="target/nmqual/psn/boot" as="xml">perl target/nmqual/csv/sections2csv.pl '^means' bootstrap_results.csv | perl target/nmqual/csv/csv2xml.pl</do>
+       <do on="psntest" in="target/nmqual/psn/boot" as="xml">perl target/nmqual/csv/sections2csv.pl standard.error.confidence.intervals bootstrap_results.csv | perl target/nmqual/csv/csv2xml.pl</do>
+       <do on="psntest" as="xml">cat target/nmqual/log.xml</do>
+       <to on="psntest">$_1</to>
+       <!--The 'accept' interface embeds an acceptance statement at the end of the log.-->
+       <do on="accept">echo $_</do>
+       <to on="accept">$0</to>
+      </config>
+      <job>
+       <do>date</do>
+       <so>Fri Jun 29 15:07:22 UTC 2018</so>
+      </job>
+      <job>
+       <do>rm -rf /mnt/nmqual-8.4.0/temp</do>
+       <so/>
+      </job>
+      <job>
+       <do>mkdir /mnt/nmqual-8.4.0/temp</do>
+       <so/>
+      </job>
+      <job>
+       <do>cp -r /mnt/nm743CD/* /mnt/nmqual-8.4.0/temp</do>
+       <so/>
+      </job>
+      <job>
+       <do in="/mnt/nmqual-8.4.0">patch -p0 temp/SETUP74 nix/setup74.diff</do>
+       <so>patching file temp/SETUP74</so>
+      </job>
+      <job>
+       <do>rm -rf /opt/NONMEM/nm74</do>
+       <so/>
+      </job>
+      <job>
+       <do>mkdir /opt/NONMEM/nm74</do>
+       <so/>
+      </job>
+      <job>
+       <do in="/mnt/nmqual-8.4.0/temp">pwd</do>
+       <so>/mnt/nmqual-8.4.0/temp</so>
+      </job>
+      <job>
+       <do in="/mnt/nmqual-8.4.0/temp">ifort --version</do>
+       <so>ifort (IFORT) 12.0.4 20110427
+          Copyright (C) 1985-2011 Intel Corporation.  All rights reserved.
+          </so>
+      </job>
+      <job>
+       <do in="/mnt/nmqual-8.4.0/temp">/bin/bash SETUP74 /mnt/nmqual-8.4.0/temp /opt/NONMEM/nm74 ifort y ar same rec q unzip nonmem74e.zip nonmem74r.zip</do>
+       <so>NONMEM 7.4.3 INSTALLATION UTILITY - UNIX Bourne-Again SHell version
+          For instructions, see readme_743.pdf on the CD or NONMEM installer directory
+           
+          SETUP74 /mnt/nmqual-8.4.0/temp /opt/NONMEM/nm74 ifort y ar same rec q unzip nonmem74e.zip nonmem74r.zip
+          CD-ROM drive is /mnt/nmqual-8.4.0/temp
+          NONMEM 7.4 directory is /opt/NONMEM/nm74
+          Command for FORTRAN compiles is ifort
+          Optimization for Fortran compiles is y
+          Command to build NONMEM archive is ar
+          Sizes is same (SIZES.f90 is always used)
+          Recompile is rec
+           All binaries will be recompiled
+          Interactive is q
+          Unzip program is unzip
+          Encrypted source file is nonmem74e.zip
+          Unencrypted file is nonmem74r.zip
+           
+          To learn how to override the defaults, enter
+          % SETUP74 help
+           
+          directory /opt/NONMEM/nm74
+          Step 1a. Copy files from /mnt/nmqual-8.4.0/temp to /opt/NONMEM/nm74
+          Step 1b. Copy files from /mnt/nmqual-8.4.0/temp/NONMEM_7.4.3 to /opt/NONMEM/nm74
+           
+          Installing NONMEM 7.4.3 (Enter Ctrl-C to interrupt) ...
+          Step 2a. Make sub-directories of /opt/NONMEM/nm74
+          Extract rest of files
+          Choosing platform-dependent files ...
+          os is Linux
+          cpu is x86_64
+            Will use install_Linux
+          Compiler is ifort
+            Will use util/finish_Linux_ifort
+          
+           
+          === Checking compiler
+          Version of ifort is:
+           
+          ===
+          the compiler options are -fp-model strict -Gs -nologo -nbs -w
+          Copying NONMEM license file nonmem.lic to
+          /opt/NONMEM/nm74/license/nonmem.lic
+          Warning: the license may be expired or may expire soon.
+          When this happens, NONMEM runs will fail.
+          If you have a new license file from IDS, you may stop, replace
+          it and restart SETUP74. Otherwise, allow NONMEM installation
+          to finish at this time.
+          Obtain a new license file from IDS (IDSSOFTWARE@iconplc.com)
+          as as soon as possible and replace
+          /opt/NONMEM/nm74/license/nonmem.lic
+           
+          Changes to License file, resource/SIZES.f90 and other resource
+          files may be made here.
+          Step 6. Compile resource files
+          Compile of resource files was successful.
+          resource directory has been compiled
+          Step 9. Compile all remaining source files
+          This will take a long time.
+          See file /opt/NONMEM/nm74/progress.txt for compiler progress
+          Step 10. Build NONMEM archive nm/nonmem.a
+          Step 13. Create shell script util/nmfe74
+          finished nmfe74
+          Step 14. Create directory run
+          run contains the following files:
+          nmfe74 CONTROL3 CONTROL5 DATA3 THEOPP REPORT5IDS.txt
+          run contains additional files
+           
+          Installation of NONMEM 7.4.3 is finished.
+          For future reference, the command has been saved in file SETUP.TXT
+           
+          Please review /opt/NONMEM/nm74/compilemsgs.txt
+                        /opt/NONMEM/nm74/finishmsgs.txt
+          Ignore warnings. Report error messages.
+           
+          Help and html files and Users Guides will be installed.
+          Step 15. Install NONMEM Users Guide files in /opt/NONMEM/nm74/guides
+          Unzipping guides.zip ...
+          To use the NONMEM Users Guides,
+            open pdf files in /opt/NONMEM/nm74/guides using Adobe Reader.
+          Step 16. Install On-line help files in /opt/NONMEM/nm74/help
+          Unzipping help.zip ...
+          For online help, enter (e.g.)
+            cd /opt/NONMEM/nm74/help
+            ./nmhelp advan2
+          Step 17. Install HTML files in /opt/NONMEM/nm74/html (this may take a while) ...
+          Unzipping html.zip ...
+          For online help HTML files,
+            open /opt/NONMEM/nm74/index.html in web browser
+           
+          Do you want to test the installation?
+          Testing the installation. Commands are
+              cd /opt/NONMEM/nm74/run
+              ./nmfe74 CONTROL5 REPORT5.txt -prdefault
+          If the run is successful, file REPORT5.txt will be created.
+           
+          Starting NMTRAN
+            
+           WARNINGS AND ERRORS (IF ANY) FOR PROBLEM    1
+                       
+           (WARNING  2) NM-TRAN INFERS THAT THE DATA ARE POPULATION.
+                       
+           (WARNING  43) THE $PK BLOCK REQUESTS "CALL ONCE PER INDIVIDUAL RECORD", BUT
+           DATA ITEMS ARE USED IN THE $PK BLOCK. VALUES OF THESE DATA ITEMS
+           SUBSEQUENT TO THOSE FROM THE FIRST EVENT RECORD WILL BE IGNORED.  IF THIS
+           IS NOT APPROPRIATE, THE CALL DATA ITEM CAN BE USED TO OBTAIN ADDITIONAL
+           CALLS, OR $PK'S CALLING PROTOCOL SHOULD BE CHANGED.
+          Building NONMEM Executable
+          Starting nonmem execution ...
+          License Registered to: Temporary License for Installing NONMEM 7.4.3
+          Expiration Date:    30 MAR 2018
+          Current Date:       29 JUN 2018
+           
+            **** NONMEM LICENSE HAS EXPIRED ****
+            ****     NONMEM TERMINATING     ****
+            **** CONTACT idssoftware@iconplc.com FOR RENEWAL ****
+           
+          Done with nonmem execution
+          Nonmem executable was created but did not run successfully.
+          This may be because the license is expired.
+          Obtain a new license file from IDS (IDSSOFTWARE@iconplc.com)
+          and replace
+          /opt/NONMEM/nm74/license/nonmem.lic</so>
+      </job>
+      <job>
+       <do>mkdir /opt/NONMEM/nm74/nmqual</do>
+       <so/>
+      </job>
+      <job>
+       <do>mkdir /opt/NONMEM/nm74/nmqual/doc</do>
+       <so/>
+      </job>
+      <job>
+       <do>cp autolog.pl /opt/NONMEM/nm74/nmqual</do>
+       <so/>
+      </job>
+      <job>
+       <do>cp -r /mnt/nmqual-8.4.0/con /opt/NONMEM/nm74/nmqual</do>
+       <so/>
+      </job>
+      <job>
+       <do>cp -r /mnt/nmqual-8.4.0/csv /opt/NONMEM/nm74/nmqual</do>
+       <so/>
+      </job>
+      <job>
+       <do>cp /mnt/nmqual-8.4.0/doc/nix/* /opt/NONMEM/nm74/nmqual/doc</do>
+       <so/>
+      </job>
+      <job>
+       <do>cp -r /mnt/nmqual-8.4.0/psn /opt/NONMEM/nm74/nmqual</do>
+       <so/>
+      </job>
+      <job>
+       <do>cp /mnt/nmqual-8.4.0/nix/setup74.diff /opt/NONMEM/nm74/nmqual/doc</do>
+       <so/>
+      </job>
+      <job>
+       <do>cp /mnt/nmqual-8.4.0/temp/SETUP74 /opt/NONMEM/nm74/nmqual/doc</do>
+       <so/>
+      </job>
+      <job>
+       <do>rm -rf /mnt/nmqual-8.4.0/temp</do>
+       <so/>
+      </job>
+      <job>
+       <do>cp -r /mnt/nmqual-8.4.0/test /opt/NONMEM/nm74/nmqual</do>
+       <so/>
+      </job>
+      <job>
+       <do>chmod 0777 /opt/NONMEM/nm74/license/nonmem.lic</do>
+       <so/>
+      </job>
+      <job>
+       <do>cp /etc/chef/cookbooks/ifort-nonmem/files/default/nonmem.lic /opt/NONMEM/nm74/license/nonmem.lic</do>
+       <so/>
+      </job>
+      <job>
+       <do>cp /usr/local/mpich3/lib/libmpich.a /opt/NONMEM/nm74/mpi/mpi_lini</do>
+       <so/>
+      </job>
+      <job>
+       <do>cp /opt/NONMEM/nm74/util/nmfe74 /opt/NONMEM/nm74/util/nmfe74.old</do>
+       <so/>
+      </job>
+      <job>
+       <do>cp /opt/NONMEM/nm74/util/nmfe74 /opt/NONMEM/nm74/run/nmfe74.old</do>
+       <so/>
+      </job>
+      <job>
+       <do>patch -p0 -R /opt/NONMEM/nm74/util/nmfe74 nix/nmfe74.diff</do>
+       <so>patching file /opt/NONMEM/nm74/util/nmfe74</so>
+      </job>
+      <job>
+       <do>patch -p0 -R /opt/NONMEM/nm74/run/nmfe74 nix/nmfe74.diff</do>
+       <so>patching file /opt/NONMEM/nm74/run/nmfe74</so>
+      </job>
+      <job>
+       <do>perl autolog.pl nix/nm74.xml meta</do>
+       <so>
+        <log>
+         <logged on="meta">
+          <config>
+           <!--Linux / Darwin with ifort compile opts for cross-platform reproducibility.-->
+           <alias id="folder">/mnt/nm743CD</alias>
+           <alias id="target">/opt/NONMEM/nm74</alias>
+           <alias id="origin">/mnt/nmqual-8.4.0</alias>
+           <alias id="unlock">/etc/chef/cookbooks/ifort-nonmem/files/default/nonmem.lic</alias>
+           <alias id="mpicha">/usr/local/mpich3/lib/libmpich.a</alias>
+           <!--The meta interface groups commands that collect metadata.-->
+           <do on="meta">pwd</do>
+           <do on="meta">date</do>
+           <do on="meta">perl -e 'use POSIX; print join qq(,),uname'</do>
+           <do on="meta">echo $SHELL</do>
+           <do on="meta">echo $USER</do>
+           <do on="meta">echo $PATH</do>
+           <do on="meta">head -n 5 target/util/nmfe74</do>
+           <do on="meta">which ifort</do>
+           <!--The 'install' interface installs NONMEM.-->
+           <do on="install">date</do>
+           <do on="install">rm -rf origin/temp</do>
+           <do on="install">mkdir origin/temp</do>
+           <do on="install">cp -r folder/* origin/temp</do>
+           <do on="install" in="origin">patch -p0 temp/SETUP74 nix/setup74.diff</do>
+           <!--alters compile options in setup73-->
+           <do on="install">rm -rf target</do>
+           <do on="install">mkdir target</do>
+           <do on="install" in="origin/temp">pwd</do>
+           <do on="install" in="origin/temp">ifort --version</do>
+           <do on="install" in="origin/temp">/bin/bash SETUP74 origin/temp target ifort y ar same rec q unzip nonmem74e.zip nonmem74r.zip</do>
+           <do on="install">mkdir target/nmqual</do>
+           <do on="install">mkdir target/nmqual/doc</do>
+           <do on="install">cp $0 target/nmqual</do>
+           <!--runtime copy of autolog.pl, uses nmqual/log.xml as config-->
+           <do on="install">cp -r origin/con target/nmqual</do>
+           <!--support for processing xml docs-->
+           <do on="install">cp -r origin/csv target/nmqual</do>
+           <!--support for processing csv docs-->
+           <do on="install">cp origin/doc/nix/* target/nmqual/doc</do>
+           <!--reference modeling results-->
+           <do on="install">cp -r origin/psn target/nmqual</do>
+           <!--support for psn qualification-->
+           <do on="install">cp origin/nix/setup74.diff target/nmqual/doc</do>
+           <!--keep for archival purposes-->
+           <do on="install">cp origin/temp/SETUP74 target/nmqual/doc</do>
+           <!--keep for archival purposes-->
+           <do on="install">rm -rf origin/temp</do>
+           <do on="install">cp -r origin/test target/nmqual</do>
+           <!--supports control tests-->
+           <do on="install">chmod 0777 target/license/nonmem.lic</do>
+           <!--enable overwriting-->
+           <do on="install">cp unlock target/license/nonmem.lic</do>
+           <!--replace expired license-->
+           <do on="install">cp mpicha target/mpi/mpi_lini</do>
+           <!--replace default mpich archive-->
+           <!--patch util/nmfe73 and run/nmfe73 to accept compile/execute option-->
+           <do on="install">cp target/util/nmfe74 target/util/nmfe74.old</do>
+           <do on="install">cp target/util/nmfe74 target/run/nmfe74.old</do>
+           <do on="install">patch -p0 -R target/util/nmfe74 nix/nmfe74.diff</do>
+           <do on="install">patch -p0 -R target/run/nmfe74 nix/nmfe74.diff</do>
+           <do on="install" as="xml">perl $0 $_0 meta</do>
+           <to on="install">target/nmqual/log.xml</to>
+           <!--The 'basic' interface does not expect a compile/execute argument (nmfe73-as-modified no longer requires it).-->
+           <!--Run directory and run name are required arguments.-->
+           <do on="basic" as="xml">perl $0 $_0 meta</do>
+           <do on="basic" in="$_1">target/util/nmfe74 $_2.ctl $_2.lst</do>
+           <do on="basic" in="$_1" as="xml">if [ -e $_2.xml ];then cat $_2.xml;else echo \&lt;nofile/\>; fi</do>
+           <do on="basic" as="xml">cat target/nmqual/log.xml</do>
+           <to on="basic">$_1/$_2.log.xml</to>
+           <!--The 'run' interface expects a leading compile/execute argument.-->
+           <do on="run" as="xml">perl $0 $_0 meta</do>
+           <do on="run" in="$_2">target/util/nmfe74 $_1 $_3.ctl $_3.lst</do>
+           <do on="run" in="$_2" as="xml">if [ -e $_3.xml ];then cat $_3.xml;else echo \&lt;nofile/\>; fi</do>
+           <do on="run" as="xml">cat target/nmqual/log.xml</do>
+           <to on="run">$_2/$_3.log.xml</to>
+           <!--The 'para' interface additionally expects [run].pnm to be present in the run directory.-->
+           <do on="para" as="xml">perl $0 $_0 meta</do>
+           <do on="para" in="$_2">target/util/nmfe74 $_1 $_3.ctl $_3.lst -parafile=$_3.pnm</do>
+           <do on="para" in="$_2" as="xml">if [ -e $_3.xml ];then cat $_3.xml;else echo \&lt;nofile/\>; fi</do>
+           <do on="para" as="xml">cat target/nmqual/log.xml</do>
+           <to on="para">$_2/$_3.log.xml</to>
+           <!--The 'test' interface invokes nmfe directly, without the compile/execute argument.-->
+           <do on="test" in="target/nmqual/test">target/util/nmfe74 $_1.ctl $_1.lst</do>
+           <do on="test" in="target/nmqual/test" as="xml">cat $_1.xml</do>
+           <!--The 'qualify' interface runs a full suite of qualification tests.-->
+           <do on="qualify" as="xml">perl $0 $_0 meta</do>
+           <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 3</do>
+           <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 4</do>
+           <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 5</do>
+           <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 6</do>
+           <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 7</do>
+           <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test 8</do>
+           <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test example5</do>
+           <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test example6</do>
+           <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test example7</do>
+           <do on="qualify" in="target/nmqual" as="xml">perl autolog.pl log.xml test example10</do>
+           <do on="qualify" as="xml">cat target/nmqual/log.xml</do>
+           <to on="qualify">$_1</to>
+           <!--The 'regress' interface runs a reduced suite of tests quickly, e.g. for regression testing.-->
+           <do on="regress" as="xml">perl $0 $_0 meta</do>
+           <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 3</do>
+           <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 4</do>
+           <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 5</do>
+           <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 6</do>
+           <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 7</do>
+           <do on="regress" in="target/nmqual" as="xml">perl autolog.pl log.xml test 8</do>
+           <do on="regress" as="xml">cat target/nmqual/log.xml</do>
+           <to on="regress">$_1</to>
+           <!--The 'psntest' interface runs PsN control tests.-->
+           <do on="psntest" as="xml">perl $0 $_0 meta</do>
+           <do on="psntest" in="target/nmqual/psn">execute -directory=runs -seed=1 TST33611.nmctl TST33612.nmctl TST33613.nmctl</do>
+           <do on="psntest" in="target/nmqual/psn">bootstrap -samples=20 -dir=boot -seed=1 TST3362.nmctl</do>
+           <do on="psntest" in="target/nmqual/psn/runs" as="xml">perl target/nmqual/csv/csv2xml.pl raw_results_TST33611.csv</do>
+           <do on="psntest" in="target/nmqual/psn/boot" as="xml">perl target/nmqual/csv/csv2xml.pl raw_results_TST3362.csv</do>
+           <do on="psntest" in="target/nmqual/psn/boot" as="xml">perl target/nmqual/csv/sections2csv.pl '^means' bootstrap_results.csv | perl target/nmqual/csv/csv2xml.pl</do>
+           <do on="psntest" in="target/nmqual/psn/boot" as="xml">perl target/nmqual/csv/sections2csv.pl standard.error.confidence.intervals bootstrap_results.csv | perl target/nmqual/csv/csv2xml.pl</do>
+           <do on="psntest" as="xml">cat target/nmqual/log.xml</do>
+           <to on="psntest">$_1</to>
+           <!--The 'accept' interface embeds an acceptance statement at the end of the log.-->
+           <do on="accept">echo $_</do>
+           <to on="accept">$0</to>
+          </config>
+          <job>
+           <do>pwd</do>
+           <so>/mnt/nmqual-8.4.0</so>
+          </job>
+          <job>
+           <do>date</do>
+           <so>Fri Jun 29 15:11:45 UTC 2018</so>
+          </job>
+          <job>
+           <do>perl -e 'use POSIX; print join qq(,),uname'</do>
+           <so>Linux,ip-10-0-0-42,3.13.0-93-generic,#140-Ubuntu SMP Mon Jul 18 21:21:05 UTC 2016,x86_64</so>
+          </job>
+          <job>
+           <do>echo $SHELL</do>
+           <so>/bin/bash</so>
+          </job>
+          <job>
+           <do>echo $USER</do>
+           <so>root</so>
+          </job>
+          <job>
+           <do>echo $PATH</do>
+           <so>/opt/intel/bin/intel64:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/chef/embedded/bin:/opt/chef/embedded/bin:/opt/intel/mpirt/bin/intel64</so>
+          </job>
+          <job>
+           <do>head -n 5 /opt/NONMEM/nm74/util/nmfe74</do>
+           <so>#!/bin/bash
+                     dir=/opt/NONMEM/nm74
+                     f=ifort
+                     o=' -fp-model strict -Gs -nologo -nbs -w '
+                     opstat=' -static '</so>
+          </job>
+          <job>
+           <do>which ifort</do>
+           <so>/opt/intel/bin/intel64/ifort</so>
+          </job>
+         </logged>
+        </log>
+       </so>
+      </job>
+     </logged>
+    </log>
+   </so>
+  </job>
+ </logged>
+</log>

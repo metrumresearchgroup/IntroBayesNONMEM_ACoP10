@@ -1,0 +1,658 @@
+
+---
+title: |
+       | Introduction to Bayesian pharmacometric data analysis using NONMEM
+       |
+       | Hands-on 4: PopPKPD analysis using MCMC
+author: "Metrum Research Group"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output:
+  html_document:
+    css: styles/styles.css
+    highlight: pygments
+    theme: flatly
+---
+
+# Population Parameter Estimation
+
+## Estimation of Friberg-Karlsson model of drug-induced myelosuppression.
+
+![](../doc/IntroBayesNONMEMAmgenAug2019/graphics/FribergPub.png)
+
+---
+
+![](../doc/IntroBayesNONMEMAmgenAug2019/graphics/FribergModel.png)
+
+---
+
+<br>
+
+## Specification of prior distributions
+
+---
+
+## Setup R environment
+
+```{r setup, results = 'hide'}
+
+rm(list = ls())
+gc()
+
+modelName <- "friberg3"
+scriptName <- paste(modelName, "Rmd", sep = ".")
+fitModel <- FALSE
+
+## Relative paths assuming the working directory is the script directory
+## containing this script
+scriptDir <- getwd()
+projectDir <- dirname(scriptDir)
+dataDir <- file.path(projectDir, "data")
+modelDir <- file.path(projectDir, "model")
+outDir <- file.path(modelDir, modelName)
+figDir <- file.path(projectDir, "deliv", "figure", modelName)
+tabDir <- file.path(projectDir, "deliv", "table", modelName)
+invisible(dir.create(figDir, recursive = TRUE))
+invisible(dir.create(tabDir, recursive = TRUE))
+
+
+library(metrumrg)
+suppressMessages(library(rstan))
+suppressMessages(library(bayesplot))
+suppressMessages(library(tidyverse))
+library(gridExtra)
+library(parallel)
+library(knitr)
+library(kableExtra)
+library(qapply)
+library(PKPDmisc)
+library(GGally)
+
+knitr::opts_chunk$set(
+  comment = '.', 
+  fig.height = 5, 
+  fig.width = 9,
+  eval.after = 'fig.cap',
+  message = FALSE,
+  fig.path = file.path(figDir, paste(modelName, "_", sep = ""))
+)
+
+## Go back to default ggplot2 theme that was overridden by bayesplot
+theme_set(theme_gray())
+
+source(file.path(scriptDir, "tools", "stanTools2.R"))
+source(file.path(scriptDir, "tools", "functions.R"))
+
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+RNGkind("L'Ecuyer-CMRG")
+set.seed(11191951) 
+set.seed(10271998) 
+
+```
+
+## The NONMEM model stub
+
+```{r nonmemModel}
+
+modelFile <- file.path(modelDir, paste(modelName, "stub.ctl", sep = ""))
+modelText <- readLines(modelFile)
+cat(modelText, sep = "\n")
+
+```
+
+## Assemble initial estimates, priors and table specs
+
+```{r initsPriors}
+
+## create initial estimates
+geninit <- function(){
+    paste(c(
+    "; Initial values of THETA",
+    "$THETA",
+    paste(rnorm(1, log(10),0.5), "     ; Log CL = THETA(1)"),
+    paste(rnorm(1, log(15), 0.5), "     ; Log Q = THETA(2)"),
+    paste(rnorm(1, log(35), 0.5), "   ; Log V1 = THETA(3)"),
+    paste(rnorm(1, log(105), 0.5), "   ; Log V2= THETA(4) "),
+    paste(rnorm(1, log(2), 0.5), "   ; Log Ka = THETA(5) "),
+    paste(rnorm(1, log(125), 0.2), "   ; Log MTT = THETA(6) "),
+    paste(rnorm(1, log(5), 0.2), "   ; Log CIRC0 = THETA(7) "),
+    paste(rnorm(1, log(3E-4), 1), "   ; Log ALPHA = THETA(8) "),
+    paste(rnorm(1, log(0.17), 0.2), "   ; Log GAMMA = THETA(9) "),
+    paste(rnorm(1, log(0.2), 0.2), "   ; Log PK Add Error = THETA(10) "),
+    paste(rnorm(1, log(0.2), 0.2), "   ; Log PD Add Error = THETA(11) "),
+    "$OMEGA BLOCK(8) ;INITIAL values of OMEGAs",
+    paste(exp(rnorm(1, log(0.25), 0.5))),
+    paste(rep(rnorm(1, 0.001, 0.01),1)), paste(exp(rnorm(1, log(0.25), 0.5))),
+    paste(rep(rnorm(1, 0.001, 0.01),2)), paste(exp(rnorm(1, log(0.25), 0.5))),
+    paste(rep(rnorm(1, 0.001, 0.01),3)), paste(exp(rnorm(1, log(0.25), 0.5))),
+    paste(rep(rnorm(1, 0.001, 0.01),4)), paste(exp(rnorm(1, log(0.25), 0.5))),
+    paste(rep(rnorm(1, 0.001, 0.01),5)), paste(exp(rnorm(1, log(0.25), 0.5))),
+    paste(rep(rnorm(1, 0.001, 0.01),6)), paste(exp(rnorm(1, log(0.25), 0.5))),
+    paste(rep(rnorm(1, 0.001, 0.01),7)), paste(exp(rnorm(1, log(0.05), 0.5))),
+    "$OMEGA DIAG(3) ;INITIAL values of unused OMEGAs",
+    "0 FIX; GAMMA",
+    "0 FIX; Add PK",
+    "0 FIX; Add PD",
+    "$SIGMA  ;Initial value of SIGMA",
+    "1 FIX; Add PK",
+    "1 FIX; Add PD"),
+    sep = "\n")
+}
+
+## Set parameters of the prior distribution
+priors <- paste(c("$PRIOR NWPRI",
+                  "$THETAP          ; Prior information of THETAS",
+                  "(2.3 FIX)     ; CL Log(10)  ",
+                  "(2.7 FIX)     ; Q  Log(15)" ,
+                  "(3.56 FIX)     ; V1 Log(35)",
+                  "(4.7 FIX)    ; V2 Log(105)",
+                  "(0.693 FIX)      ; KA log(2)",
+                  "(4.83 FIX)    ; MTT Log(125)",
+                  "(1.61 FIX)      ; CIRC0 Log(5) ",
+                  "(-8.11 FIX)   ; ALPHA Log(3E-4)",
+                  "(-1.78 FIX)   ; GAMMA Log(0.17)",
+                  "(-1.60 FIX)   ; log Add error PK Log(0.20)",
+                  "(-1.60 FIX)   ; log Add error PD Log(0.20)",
+                  "$THETAPV BLOCK(11)     ;  variances for priors on THETAS (var-cov)",
+                  "0.25   FIX          ; CL ",
+                  "0.00   0.25            ; Q",
+                  "0.00   0.00   0.25        ; V1",
+                  "0.00   0.00   0.00   0.25      ; V2",
+                  "0.00   0.00   0.00   0.00   0.25    ; KA ",
+                  "0.00   0.00   0.00   0.00   0.00   0.04    ; MTT ",
+                  "0.00   0.00   0.00   0.00   0.00   0.00   0.04    ; CIRC0 ",
+                  "0.00   0.00   0.00   0.00   0.00   0.00   0.00   1   ; ALPHA ",
+                  "0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00  0.04  ; GAMMA  ",
+                  "0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00  0.00  1.00  ; Error PK  ",
+                  "0.00   0.00   0.00   0.00   0.00   0.00   0.00   0.00  0.00  0.00  1.00  ; Error PD  ",
+                  "$OMEGAP BLOCK(8) ;prior information for OMEGA",
+                  "0.045    FIX          ; CL ",
+                  "0.00   0.045            ; Q",
+                  "0.00   0.00   0.045        ; V1",
+                  "0.00   0.00   0.00   0.045      ; V2",
+                  "0.00   0.00   0.00   0.00   0.045    ; KA",
+                  "0.00   0.00   0.00   0.00   0.00   0.045    ; MTT",
+                  "0.00   0.00   0.00   0.00   0.00   0.00   0.045    ; CIRC0",
+                  "0.00   0.00   0.00   0.00   0.00   0.00   0.00  0.045   ; ALPHA",
+                  "$OMEGAPD (11, FIXED)     ; df for OMEGA prior"
+),
+sep = "\n")
+
+## Table statements
+tables <- paste(c("$TABLE ID EVID TIME DV IPRED CWRES CWRESI NPDE WT",
+                  "NOPRINT ONEHEADER FILE=./.tab",
+                  "$TABLE ID WT CL Q V1 V2 KA MTT CIRC0 ALPHA ETAS(1:LAST)",
+                  "NOPRINT ONEHEADER FILE=./par.tab"),
+                sep = "\n")
+
+```
+
+## Run NONMEM
+
+``` {r runStan, results = 'hide'}
+
+nChains <- 4
+nPost <- 250 ## Number of post-burn-in samples per chain after thinning
+nBurn <- 250 ## Number of burn-in samples per chain after thinning
+nThin <- 1
+
+
+seed = sample(10000, size = nChains)
+
+if(fitModel){
+  if(!file.exists(file.path(modelDir, modelName))) 
+    dir.create(file.path(modelDir, modelName))
+  
+  runChains <- lapply(1:nChains, runChain,
+                      modelName = modelName, modelDir = modelDir, 
+                      priors = priors, tables = tables,
+                      nPost = nPost, nBurn = nBurn, nThin = nThin, 
+                      seed = seed, print = 100,
+                      OLKJDF = 0, OVARF = 1, AUTO = 2,
+                      NUTS_DELTA = 0.8,
+                      grid = TRUE, method = "NUTS", mode='not para')
+  
+
+    }
+
+```
+
+## read in data file
+```{r getData}
+
+dataFile <- "friberg.csv"
+nmData <- read.csv(file.path(dataDir, dataFile), as.is = TRUE, na.strings = '.')
+
+```
+
+## Get population parameters
+
+```{r getPopParam}
+
+chains <- 1:nChains
+##chains <- c(1, 3, 4)
+
+nChains2 <- length(chains)
+
+## Read in posterior distributions by chain and add a column called chain
+popParameters = map(chains, function(thisChain){
+  param <- data.table::fread(file.path(modelDir, modelName, paste(modelName, ".", thisChain, sep = ""), 
+                                       "par.txt"), data.table = FALSE) 
+  names(param) <- c("iteration", 
+                    "THETA1", "THETA2", "THETA3", "THETA4", 
+                    "THETA5", "THETA6", "THETA7", "THETA8",
+                    "THETA9", "THETA10", "THETA11",
+                    "OMEGA11", "OMEGA21", "OMEGA22","OMEGA13", "OMEGA23", "OMEGA33",
+                    "OMEGA14", "OMEGA24", "OMEGA34","OMEGA44", "OMEGA15", "OMEGA25",
+                    "OMEGA35", "OMEGA45", "OMEGA55","OMEGA16", "OMEGA26", "OMEGA36",
+                    "OMEGA46", "OMEGA56", "OMEGA66","OMEGA17", "OMEGA27", "OMEGA37",
+                    "OMEGA47", "OMEGA57", "OMEGA67","OMEGA77", "OMEGA18", "OMEGA28",
+                    "OMEGA38", "OMEGA48", "OMEGA58","OMEGA68", "OMEGA78", "OMEGA88")
+  
+  param %>% mutate(chain = thisChain)
+}) %>% bind_rows %>%
+  mutate(sample = 1:n())
+
+## Calculate more interpretable paraneters
+popParameters2 <- popParameters %>%
+  mutate(CLHat = exp(THETA1),
+         QHat = exp(THETA2),
+         V1Hat = exp(THETA3),
+         V2Hat = exp(THETA4),
+         KaHat = exp(THETA5),
+         MTTHat = exp(THETA6),
+         CIRC0Hat = exp(THETA7),
+         ALPHAHat = exp(THETA8),
+         GAMMAHat=exp(THETA9),
+         SigmaPK = exp(THETA10),
+         SigmaPD = exp(THETA11)) %>%
+  select(starts_with("OMEGA"),
+         CLHat, QHat, V1Hat, V2Hat, KaHat, 
+         MTTHat, CIRC0Hat, ALPHAHat, GAMMAHat, SigmaPK,
+         SigmaPD, chain, iteration, sample)
+
+## Convert to 3-D array with dims = {iterations, chains, parameters}. 
+popParArray <- array(double(nPost * nChains2 * (ncol(popParameters2) - 3)), 
+                     dim = c(nPost, nChains2, ncol(popParameters2) - 3), 
+                     dimnames =  list(NULL, NULL, setdiff(names(popParameters2), c("chain", "iteration", "sample"))))
+for(iChain in 1:nChains2){
+  popParArray[,iChain,] <- popParameters2 %>%
+    filter(chain == chains[iChain],
+           iteration > 0) %>%
+    select(-chain, -iteration, -sample) %>%
+    as.matrix
+}
+
+```
+
+## Get individual parameters
+
+```{r getIndParam}
+
+indParameters = map(chains, function(thisChain){
+  files <- list.files(file.path(modelDir, modelName, paste(modelName, ".", thisChain, sep = "")))
+  iparFiles <- files[grepl("^ipar", files)]
+  param <- map(iparFiles, function(thisFile){
+    data.table::fread(file.path(modelDir, modelName, paste(modelName, ".", thisChain, sep = ""), 
+                                thisFile), data.table = FALSE)
+  }) %>% 
+    bind_rows %>% select(1:10)
+  names(param) <- c("iteration", "ID", "ETA1", "ETA2", 
+                    "ETA3","ETA4","ETA5","ETA6","ETA7","ETA8")
+  param %>% mutate(chain = thisChain)
+}) %>% bind_rows %>%
+  arrange(chain, iteration, ID) %>%
+  left_join(popParameters)
+
+```
+
+## MCMC diagnostics and posterior distributions of parameters
+
+``` {r parameters, fig.cap = caption}
+
+options(bayesplot.base_size = 12,
+        bayesplot.base_family = "sans")
+color_scheme_set(scheme = "brightblue")
+myTheme <- theme(text = element_text(size = 12), 
+                 axis.text = element_text(size = 12))
+
+plot_mcmcHistory <- mcmcHistory(popParArray,
+                                 nParPerPage = 5, myTheme = myTheme)
+plot_mcmcDensityByChain <- mcmcDensity(popParArray, 
+                                        nParPerPage = 16, byChain = TRUE, 
+                                        myTheme = theme(text = element_text(size = 12), 
+                                                        axis.text = element_text(size = 10)))
+plot_mcmcDensity <- mcmcDensity(popParArray, nParPerPage = 16, 
+                                 myTheme = theme(text = element_text(size = 12), 
+                                                 axis.text = element_text(size = 10)))
+
+plot_mcmcHistory
+plot_mcmcDensityByChain
+plot_mcmcDensity
+
+#Not ideal when there are many parameters
+#mcmc_pairs(popParArray[,,!grepl("^OMEGA", dimnames(popParArray)[[3]])])
+#mcmc_pairs(popParArray[,,grepl("^OMEGA", dimnames(popParArray)[[3]])])
+
+ggpairs(filter(popParameters2) %>% 
+          select(CLHat:GAMMAHat), 
+        diag = list(continuous = 'barDiag'), 
+        upper = list(continuous = 'points'), 
+        lower=list(continuous='points'))
+
+ggpairs(filter(popParameters) %>% 
+          select(OMEGA11,OMEGA22,OMEGA33,OMEGA44,
+                 OMEGA55,OMEGA66,OMEGA77,OMEGA88), 
+        diag = list(continuous = 'barDiag'), 
+        upper = list(continuous = 'points'), 
+        lower=list(continuous='points'))
+
+caption <- paste("Friberg-Karlsson PK-PD example:",
+      c(rep("MCMC trace plots.", length(plot_mcmcHistory)),
+        rep("Univariate marginal densities by chain.",
+            length(plot_mcmcDensityByChain)),
+        rep("Univariate marginal densities.",
+            length(plot_mcmcDensityByChain)),
+        rep("Correlation Plots.", 2)))
+
+ptable <- monitor(popParArray, 
+                  warmup = 0, print = FALSE) %>% 
+  as.matrix() %>%
+  formatC(3) %>%
+  as.data.frame
+write.csv(ptable, file = file.path(tabDir, paste(modelName, 
+                                                 "ParameterTable.csv", sep = "")))
+
+ptable %>% 
+  rename(SEmean = se_mean, SD = sd, pct2.5 = "2.5%", pct25 = "25%", median = "50%",
+         pct75 = "75%", pct97.5 = "97.5%", Neff = "n_eff") %>%
+  mutate(parameter = rownames(.), "95% CI" = paste("(", pct2.5, ", ", pct97.5, ")", 
+                                                   sep = "")) %>%
+  select(parameter, mean, SD, median, "95% CI", Neff, Rhat) %>%
+  kable(caption = "Summary of model parameter estimates.") %>%
+  kable_styling(bootstrap_options = "striped", full_width = F)
+
+```
+
+## Construct design data frame
+
+```{r design}
+
+## For now just use the NONMEM data set
+
+design <- nmData %>%
+  mutate(ID = id, WT = weight) %>%
+  filter(is.na(C))
+
+
+```
+
+## mrgsolve model code for posterior predictions
+
+```{r model code}
+
+library(mrgsolve)
+
+indCode =
+  '
+$PARAM 
+THETA1 = 2.3
+THETA2 = 2.7
+THETA3 = 3.56
+THETA4 = 4.7
+THETA5 = 0.693
+THETA6 = 4.43
+THETA7 = 2.33
+THETA8 = -1.78
+THETA9 = -8.11
+THETA10 = -1
+THETA11 = -1
+WT = 70
+ETA1 = 0
+ETA2 = 0
+ETA3 = 0
+ETA4 = 0
+ETA5 = 0
+ETA6 = 0
+ETA7 = 0
+ETA8 = 0
+
+$CMT GUT, CENT, PERIPH, 
+PROL, TRANS1, TRANS2, TRANS3, CIRC
+
+$MAIN
+
+double VWT = log(WT/70); 
+double CL = exp(THETA1 + (VWT * 0.75) + ETA1 + ETA(1)); 
+double Q = exp(THETA2 + (VWT * 0.75) + ETA2 + ETA(2));
+double V1 = exp(THETA3 + VWT + ETA3 + ETA(3));
+double V2 = exp(THETA4 + VWT + ETA4 + ETA(4));
+double KA = exp(THETA5 + ETA5 + ETA(5));
+double MTT = exp(THETA6 + ETA6 + ETA(6));
+double CIRC0 = exp(THETA7 + ETA7 + ETA(7));
+double ALPHA = exp(THETA8 + ETA8 + ETA(8));
+double GAMMA = exp(THETA9);
+double SIG1 = exp(THETA10);
+double SIG2 = exp(THETA11);
+
+// intermediate calculations
+double K10 = CL/V1;
+double K12 = Q/V1;
+double K21 = Q/V2;
+double KTR = 4/MTT;
+double KPROL = KTR;
+double KCIRC = KTR;
+
+PROL_0 = CIRC0;
+TRANS1_0 = CIRC0;
+TRANS2_0 = CIRC0;
+TRANS3_0 = CIRC0;
+CIRC_0 = CIRC0;
+
+$ODE
+dxdt_GUT = -KA*GUT;
+dxdt_CENT = KA*GUT - K10*CENT - K12*CENT + K21*PERIPH;
+dxdt_PERIPH = K12*CENT - K21*PERIPH;
+
+double CONC = std::max(0.0,CENT/V1);
+double EDRUG = CONC*ALPHA;
+if(EDRUG > 1) EDRUG = 1;
+
+dxdt_PROL = KPROL* PROL *(1 - EDRUG) * (pow((CIRC0 / CIRC), GAMMA)) - KTR *PROL;
+dxdt_TRANS1 = KTR * (PROL - TRANS1);
+dxdt_TRANS2 = KTR * (TRANS1 - TRANS2);
+dxdt_TRANS3 = KTR * (TRANS2 - TRANS3);
+dxdt_CIRC =  KTR*TRANS3 - KCIRC*CIRC;
+
+$SIGMA 1 1
+
+$OMEGA @block
+0 
+0 0
+0 0 0
+0 0 0 0
+0 0 0 0 0
+0 0 0 0 0 0
+0 0 0 0 0 0 0
+0 0 0 0 0 0 0 0
+
+$TABLE
+double cPredHat = std::max(0.000001,CENT/V1);
+double lcPred = log(cPredHat) + SIG1*EPS(1);
+double cPred = exp(lcPred);
+double nPredHat = CIRC;
+double lnPred = log(CIRC) + SIG2*EPS(2);
+double nPred = exp(lnPred);
+
+$CAPTURE lcPred lnPred cPred nPred
+'
+
+## Compile model
+friMod <- mcode("FRImodel", indCode)
+
+if(FALSE){
+  ## Test runs
+  out <- friMod %>%
+    data_set(design) %>%
+    carry.out(DV) %>%
+    mrgsim %>% as.data.frame()
+  
+  ggplot(data=out, aes(x=time, y=cPred)) + geom_point(aes(group=ID, color=as.factor(ID)))
+  
+}
+
+```
+
+## Individual predictions
+
+```{r indSim}
+
+samples <- unique(indParameters$sample)
+set.seed(10301987)
+indSim1 <- mclapply(samples,
+                    function(thisSample){
+                      friMod %>%
+                        data_set(design) %>%
+                        idata_set(indParameters %>% 
+                                filter(sample == thisSample)) %>%
+                        carry_out(sample, ID, time, DV, evid, DVID) %>%
+                        mrgsim() %>%
+                        as.tbl
+                    }) %>%
+  bind_rows
+
+```
+
+## Population predictions
+
+```{r popSim}
+
+samples <- unique(popParameters$sample)
+set.seed(10301987)
+popSim1 <- mclapply(samples,
+                    function(thisSample){
+                      friMod %>%
+                        data_set(design) %>%
+                        param(popParameters %>% 
+                                filter(sample == thisSample)) %>%
+                        omat(omat(as_bmat(popParameters %>% 
+                                filter(sample == thisSample),"OMEGA"))) %>%
+                        carry_out(sample, ID, time, DV, evid, DVID) %>%
+                        mrgsim %>%
+                        as.tbl
+                    }) %>%
+  bind_rows
+
+```
+
+## Posterior predictive distributions
+
+``` {r PPC, results = 'asis'}
+
+## Combined plots
+
+indPredC <- indSim1 %>% filter(evid==0, DVID==2) %>%
+  group_by(ID, time, evid) %>%
+  summarize(lbInd = quantile(cPred, probs = 0.05, na.rm = TRUE),
+            medianInd = quantile(cPred, probs = 0.5, na.rm = TRUE),
+            ubInd = quantile(cPred, probs = 0.95, na.rm = TRUE))
+
+indPredN <- indSim1 %>% filter(evid==0, DVID==1) %>%
+  group_by(ID, time, evid) %>%
+  summarize(lbInd = quantile(nPred, probs = 0.05, na.rm = TRUE),
+            medianInd = quantile(nPred, probs = 0.5, na.rm = TRUE),
+            ubInd = quantile(nPred, probs = 0.95, na.rm = TRUE))
+
+popPredC <- popSim1 %>% filter(evid==0, DVID==2) %>%
+  group_by(ID, time, evid) %>%
+  summarize(lbPop = quantile(cPred, probs = 0.05, na.rm = TRUE),
+            medianPop = quantile(cPred, probs = 0.5, na.rm = TRUE),
+            ubPop = quantile(cPred, probs = 0.95, na.rm = TRUE))
+
+popPredN <- popSim1 %>% filter(evid==0, DVID==1) %>%
+  group_by(ID, time, evid) %>%
+  summarize(lbPop = quantile(nPred, probs = 0.05, na.rm = TRUE),
+            medianPop = quantile(nPred, probs = 0.5, na.rm = TRUE),
+            ubPop = quantile(nPred, probs = 0.95, na.rm = TRUE))
+
+predAllC <- indPredC %>%
+  left_join(popPredC) %>%
+  left_join(design %>% filter(evid == 0, DVID==2)) %>%
+  mutate(DV = suppressWarnings(as.numeric(DV)))
+
+predAllN <- indPredN %>%
+  left_join(popPredN) %>%
+  left_join(design %>% filter(evid == 0, DVID==1)) %>%
+  mutate(DV = suppressWarnings(as.numeric(DV)))
+
+  p1 <- ggplot(predAllC, aes(x = time, y = DV))
+  p2 <- p1 + 
+    geom_line(aes(x = time, y = medianPop, 
+                 color = "population")) +
+    geom_ribbon(aes(ymin = lbPop, ymax = ubPop, 
+                   fill = "population"), 
+               alpha = 0.25) +
+    geom_line(aes(x = time, y = medianInd, 
+                  color = "individual")) +
+    geom_ribbon(aes(ymin = lbInd, ymax = ubInd, 
+                    fill = "individual"), 
+                alpha = 0.25) +
+    scale_color_brewer(name  ="prediction",
+                       breaks=c("individual", "population"),
+                       palette = "Set1") +
+    scale_fill_brewer(name  ="prediction",
+                      breaks=c("individual", "population"),
+                      palette = "Set1")
+  p3 <- p2 + geom_point() +
+    labs(title = 'PK Model',
+         x = "Time (h)",
+         y = "PK Conc (ng/mL)") +
+    theme(text = element_text(size = 12),
+          axis.text = element_text(size = 12),
+##          legend.position = c(0.8, 0.25),
+          strip.text = element_text(size = 8)) +
+    facet_wrap(~ ID, scales = "free_y")
+  
+  ####PD Plots#####
+
+  p1b <- ggplot(predAllN, aes(x = time, y = DV))
+  p2b <- p1b + 
+    geom_line(aes(x = time, y = medianPop, 
+                 color = "population")) +
+    geom_ribbon(aes(ymin = lbPop, ymax = ubPop, 
+                   fill = "population"), 
+               alpha = 0.25) +
+    geom_line(aes(x = time, y = medianInd, 
+                  color = "individual")) +
+    geom_ribbon(aes(ymin = lbInd, ymax = ubInd, 
+                    fill = "individual"), 
+                alpha = 0.25) +
+    scale_color_brewer(name  ="prediction",
+                       breaks=c("individual", "population"),
+                       palette = "Set1") +
+    scale_fill_brewer(name  ="prediction",
+                      breaks=c("individual", "population"),
+                      palette = "Set1")
+  p3b <- p2b + geom_point() +
+    labs(title = 'PD Model',
+         x = "Time (h)",
+         y = "ANC (10^9/L)") +
+    theme(text = element_text(size = 12),
+          axis.text = element_text(size = 12),
+##          legend.position = c(0.8, 0.25),
+          strip.text = element_text(size = 8)) +
+    facet_wrap(~ ID, scales = "free_y")
+  
+  ####
+  
+  p3
+  p3b
+
+```
+
+```{r theEnd}
+
+sessionInfo()
+
+``````

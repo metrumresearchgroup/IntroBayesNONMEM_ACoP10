@@ -1,0 +1,6 @@
+ NM-TRAN VERSION 7.4.3
+ GENERATED DP SUBROUTINES:
+ PRED     PRIOR   
+ USER-WRITTEN SUBROUTINES:
+ ../../extrasend.f90                                                           
+ NONMEM SUBROUTINES: ALL EXCEPT PRIOR

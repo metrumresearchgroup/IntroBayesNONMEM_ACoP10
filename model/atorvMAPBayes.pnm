@@ -1,0 +1,35 @@
+$GENERAL
+NODES=16 PARSE_TYPE=2 TIMEOUTI=100 TIMEOUT=10 PARAPRINT=0 TRANSFER_TYPE=1
+;SINGLE node: NODES=1
+;MULTI node: NODES>1
+;WORKER node: NODES=0
+; parse_num=number of subjects to give to each node
+; parse_type=0, give each node parse_num subjects
+; parse_type=1, evenly distribute numbers of subjects among available nodes
+; parse_type=2, load balance among nodes
+; parse_type=3, assign subjects to nodes based on idranges
+; parse_type=4, load balance among nodes, taking into account loading time.  Will assess ideal number of nodes.
+; If loading time too costly, will eventually revert to single CPU mode.
+; timeouti=seconds to wait for node to start.  if not started in time, deassign node, and give its load to next worker, until next iteration
+; timeout=minutes to wait for node to compelte.  if not completed by then, deassign node, and have manager complete it.
+; paraprint=1  print to console the parallel computing process.  Can be modified at runt-time with ctrl-B toggle.
+; But parallel.log always records parallelization progress.
+; transfer_type=0 for file transfer, 1 for mpi
+
+;THE EXCLUDE/INCLUDE may be used to selectively use certain nodes, out of a large list.
+;$EXCLUDE 5-7 ; exclude nodes 5-7
+;$EXCLUDE ALL 
+;$INCLUDE 1,4-6
+
+$COMMANDS ;each node gets a command line, used to launch the node session
+1: /usr/local/mpich3/bin/mpiexec -wdir "$PWD" -n 1 ./nonmem $*
+  2:-wdir "$PWD" -n 15 ./nonmem -worker
+;2-[nodes]:-wdir "$PWD/worker{#-1}" -n 1 ./nonmem -worker
+
+$DIRECTORIES
+1:NONE ; FIRST DIRECTORY IS THE COMMON DIRECTORY
+2-[nodes]:worker{#-1} ; NEXT SET ARE THE WORKER directories
+  
+  $IDRANGES ; USED IF PARSE_TYPE=3
+  1:1,50
+  2:51,100

@@ -1,0 +1,12 @@
+>perl /opt/NONMEM/nm74/nmqual/autolog.pl /opt/NONMEM/nm74/nmqual/log.xml meta
+/data/IntroBayesNONMEM/model/fxaInhibitAvgNUTS/fxaInhibitAvgNUTS.1>/opt/NONMEM/nm74/util/nmfe74 ce fxaInhibitAvgNUTS.1.ctl fxaInhibitAvgNUTS.1.lst
+/data/IntroBayesNONMEM/model/fxaInhibitAvgNUTS/fxaInhibitAvgNUTS.1>if [ -e fxaInhibitAvgNUTS.1.xml ];then cat fxaInhibitAvgNUTS.1.xml;else echo \<nofile/\>; fi
+
+duplicate attribute at line 379, column 73, byte 15515:
+ nm:psample_m3='1' nm:oaccept='0.500000000000000' nm:osample_m1='-1' nm:osample_m2='-1' nm:osample_m3='-1'
+ nm:massreset='-1' nm:madapt='-1' nm:nuts_mass='bd' nm:nuts_transform='0' nm:kappa='1.00000000000000'
+ nm:nuts_delta='0.800000000000000' nm:nuts_gamma='5.000000000000000E-02' nm:nuts_transform='0'
+========================================================================^
+ nm:ttdf='0.00000000000000' nm:olkjdf='0.00000000000000' nm:ovarf='1.00000000000000'
+ nm:slkjdf='0.00000000000000' nm:svarf='1.00000000000000' nm:nuts_test='0' nm:nuts_maxdepth='10'
+ at /usr/lib/perl5/XML/Parser.pm line 187.

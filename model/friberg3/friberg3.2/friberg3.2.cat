@@ -1,0 +1,4 @@
+Fri Aug 16 17:31:53 2019
+cannot locate *.msf in control stream for run 
+qsub -N Runfriberg3.2 -o /data/IntroBayesNONMEM/model/friberg3/friberg3.2 -e /data/IntroBayesNONMEM/model/friberg3/friberg3.2   -V  -j y  -sync n -shell n -b y -cwd   perl -S /opt/NONMEM/nm74/nmqual/autolog.pl /opt/NONMEM/nm74/nmqual/log.xml run ce /data/IntroBayesNONMEM/model/friberg3/friberg3.2 friberg3.2
+Run friberg3.2 has exit code 0

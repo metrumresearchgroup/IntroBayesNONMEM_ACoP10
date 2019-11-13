@@ -1,0 +1,20 @@
+$PROB fxaInhIBITAvgBAYES example, Emax model
+$INPUT C ID DOSE DV CONC EVID CMT                
+$DATA ../../../data/fxaInhAvg.csv     IGNORE=(C='C')
+
+$PRED
+
+SMALL = 1.0E-6
+IF(THETA(1) <= SMALL .OR. THETA(1) >= (100 - SMALL)) EXIT
+IF(THETA(2) <= SMALL) EXIT
+IF(THETA(3) <= SMALL) EXIT
+IF(THETA(4) <= SMALL) EXIT
+EMAX = THETA(1)
+EC50 = THETA(2)
+GAMMA = THETA(3)
+SD = THETA(4)
+
+RESP = EMAX * CONC**GAMMA / (EC50**GAMMA + CONC**GAMMA)
+ 
+Y = RESP + SD * ERR(1) 
+

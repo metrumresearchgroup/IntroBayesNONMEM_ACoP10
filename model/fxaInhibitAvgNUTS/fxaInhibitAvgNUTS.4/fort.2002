@@ -1,0 +1,21 @@
+ MCMC settings
+           1          -1           1  0.500000000000000     
+  1.000000000000000E-002   1000.00000000000     
+          -1          -1          -1  0.500000000000000     
+           2           2           0           2           2
+  0.400000000000000       1.000000000000000E-006   1000000.00000000     
+        1000        1000           2           0
+ px1: T T T T N N 
+ px2u:             
+ px2a: N N N N N N 
+ px2b: M M M M M M 
+ px2: N N N N N N 
+ px3: G G G G N N 
+ px3u: D D D D D D 
+ px4: F F F F N N 
+ theta to mu map:            0           0           0           0           0
+           0
+ sum checks            0           4           4           0           4
+           0           3
+ sum checks            0           4           4           0           4
+           0           3

@@ -1,0 +1,4 @@
+Fri Aug 23 21:06:26 2019
+cannot locate *.msf in control stream for run 
+perl -S /opt/NONMEM/nm74/nmqual/autolog.pl /opt/NONMEM/nm74/nmqual/log.xml run ce /data/IntroBayesNONMEM/model/fxaInhibitAvgBAYES/fxaInhibitAvgBAYES.2 fxaInhibitAvgBAYES.2
+Run fxaInhibitAvgBAYES.2 has exit code 0

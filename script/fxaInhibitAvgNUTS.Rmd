@@ -1,0 +1,451 @@
+
+---
+title: |
+       | Introduction to Bayesian pharmacometric data analysis using NONMEM
+       |
+       | Hands-on 1: METHOD = NUTS example
+author: "Metrum Research Group"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output:
+  html_document:
+    css: styles/styles.css
+    highlight: pygments
+    theme: flatly
+---
+
+# NONMEM workflow example
+
+## PK-PD modeling of time-averaged biomarker and PK data
+ 
+Phase 1 single dose study in healthy volunteers
+
+* Parallel dose-escalation design
+* 8 subjects per dose arm
+* Single doses of ME-2
+    + Placebo, 1.25, 5, 10, 15, 20, 30, 40, 60 and 80 mg
+* PK: plasma concentrations of parent drug
+* Biomarker: ex vivo inhibition of factor Xa activity in plasma
+    + PK and biomarker measured at 0, 0.083, 0.167, 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8, 12, 18 and 24 hours after dose.
+    
+Hands-on exercise:
+
+* Model relationship between time-averaged factor Xa inhibition and time-averaged ME-2 plasma concentrations
+
+## Model
+  
+Sigmoid Emax model relating time-averaged \% inhibition of factor Xa activity to time-averaged ME-2 plasma concentration in the $i^{th}$ subject:
+\begin{eqnarray*}
+\overline{E}_{24,i} &\sim& N\left(\hat{E}_{24,i},\sigma\right) \\
+\hat{E}_{24,i} &=& \frac{E_{max} \overline{c}_{24,i}^\gamma}{EC_{50}^\gamma + \overline{c}_{24,i}^\gamma}
+\end{eqnarray*}
+
+Weakly informative prior distributions:
+  \begin{align*}
+    \text{logit}\left(\frac{E_{max}}{100}\right) &\sim N\left(0,
+                                                   \sqrt{2}\right) \\
+    \log\left(EC_{50}\right)  &\sim N\left(\log(245), 1\right) \\
+\log\left(\gamma\right) &\sim N\left(\log(2.1), \sqrt{0.5}\right) \\
+\log\left(\sigma\right) &\sim N\left(\log(10), 1\right)
+  \end{align*}
+---
+
+## Setup R environment
+
+```{r setup, results = 'hide'}
+
+rm(list = ls())
+gc()
+
+modelName <- "fxaInhibitAvgNUTS"
+scriptName <- paste(modelName, "Rmd", sep = ".")
+fitModel <- FALSE
+
+## Relative paths assuming the working directory is the script directory
+## containing this script
+scriptDir <- getwd()
+projectDir <- dirname(scriptDir)
+dataDir <- file.path(projectDir, "data")
+modelDir <- file.path(projectDir, "model")
+outDir <- file.path(modelDir, modelName)
+figDir <- file.path(projectDir, "deliv", "figure", modelName)
+tabDir <- file.path(projectDir, "deliv", "table", modelName)
+invisible(dir.create(figDir, recursive = TRUE))
+invisible(dir.create(tabDir, recursive = TRUE))
+
+
+library(metrumrg)
+suppressMessages(library(rstan))
+suppressMessages(library(bayesplot))
+suppressMessages(library(tidyverse))
+library(gridExtra)
+library(parallel)
+library(knitr)
+library(kableExtra)
+library(qapply)
+library(PKPDmisc)
+
+knitr::opts_chunk$set(
+  comment = '.', 
+  fig.height = 5, 
+  fig.width = 9,
+  eval.after = 'fig.cap',
+  message = FALSE,
+  fig.path = file.path(figDir, paste(modelName, "_", sep = ""))
+)
+
+
+## Go back to default ggplot2 theme that was overridden by bayesplot
+theme_set(theme_gray())
+
+source(file.path(scriptDir, "tools", "stanTools2.R"))
+source(file.path(scriptDir, "tools", "functions.R"))
+
+options(mc.cores = parallel::detectCores())
+
+set.seed(11191951) 
+set.seed(10271998) 
+
+```
+
+## The NONMEM model stub
+
+```{r nonmemModel}
+
+modelFile <- file.path(modelDir, paste(modelName, "stub.ctl", sep = ""))
+modelText <- readLines(modelFile)
+cat(modelText, sep = "\n")
+
+```
+
+## Assemble initial estimates, priors and table specs
+
+```{r initsPriors}
+
+## create initial estimates
+geninit <- function(){
+    paste(c(
+    "; Initial values of THETA",
+    "$THETA",
+    paste(rnorm(1, logit(90/100), 0.25), "     ; EMAX = 100 * EXPIT(THETA(1))"),
+    paste(rnorm(1, log(120), 0.25), " ; EC50 = EXP(THETA(2))"),
+    paste(rnorm(1, log(1), 0.25), "   ; GAMMA = EXP(THETA(3))"),
+    paste(rnorm(1, log(5.9), 0.25), "  ; SD = (THETA(4)) "),
+    "$OMEGA DIAG(4);INITIAL values of OMEGAs",
+    "(0 FIX)",
+    "(0 FIX)",
+    "(0 FIX)",
+    "(0 FIX)",
+    "$SIGMA ;INITIAL values of SIGMAs",
+    "(1 FIX)",
+    sep = "\n"))
+}
+
+## Set parameters of the prior distribution
+priors <- paste(c("$PRIOR NWPRI",
+                  "$THETAP          ; Prior information of THETAS",
+                  "(0 FIX)      ;  THETA(1) EMAX",
+                  "(5.5 FIX)      ;  THETA(2) EC50",
+                  "(0.75 FIX)      ;  THETA(3) gamma",
+                  "(2.3 FIX)      ; THETA(4) SD",
+                  "$THETAPV BLOCK(4)     ;  variances for priors on THETAS (var-cov)",
+                  "2.0 FIX ; EMAX almost uniform",
+                  "0.00 1  ; EC50",
+                  "0.00 0.00 0.50  ; gamma",
+                  "0.00 0.00 0.00 1   ; SD"
+),
+sep = "\n")
+
+## Table statements
+tables <- paste(c("$TABLE ID EVID CONC DV PRED",
+                  "NOPRINT ONEHEADER FILE=./.tab",
+                  "$TABLE ID EMAX EC50 GAMMA SD",
+                  "NOPRINT ONEHEADER FILE=./par.tab"),
+                sep = "\n")
+
+```
+
+## Run NONMEM
+
+``` {r runNONMEM, results = 'hide'}
+
+nChains <- 4
+nPost <- 500 ## Number of post-burn-in samples per chain after thinning
+nBurn <- 500 ## Number of burn-in samples per chain after thinning
+nThin <- 1
+
+seed = sample(10000, size = nChains)
+if(fitModel){
+  if(!file.exists(file.path(modelDir, modelName))) 
+    dir.create(file.path(modelDir, modelName))
+  runChains <- mclapply(1:nChains, runChain,
+                      modelName = modelName, modelDir = modelDir, 
+                      priors = priors, tables = tables,
+                      nPost = nPost, nBurn = nBurn, nThin = nThin, 
+                      seed = seed, print = 100,
+                      OLKJDF = 0, OVARF = 1, AUTO = 2,
+                      grid = TRUE, method = "NUTS", mode = "nonpara")
+  }
+
+```
+
+
+## read in data file
+```{r getData}
+
+dataFile <- "fxaInhAvg.csv"
+nmData <- read.csv(file.path(dataDir, dataFile), as.is = TRUE)
+
+```
+
+## Get population parameters
+
+```{r getPopParam}
+
+chains <- 1:nChains
+##chains <- c(1, 3, 4)
+
+nChains2 <- length(chains)
+
+## Read in posterior distributions by chain and add a column called chain
+popParameters = map(chains, function(thisChain){
+  param <- data.table::fread(file.path(modelDir, modelName, paste(modelName, ".", thisChain, sep = ""), 
+                                       "par.txt"), data.table = FALSE) 
+  names(param) <- c("iteration",
+                    "THETA1", "THETA2", "THETA3", "THETA4")
+  param %>% mutate(chain = thisChain)
+}) %>% bind_rows %>%
+  mutate(sample = 1:n())
+
+## Calculate more interpretable paraneters
+popParameters2 <- popParameters %>%
+  mutate(EMAX = 100*plogis(THETA1),
+         EC50 = exp(THETA2),
+         GAMMA = exp(THETA3),
+         sigma = exp(THETA4)) %>%
+  select(EMAX,EC50,GAMMA,sigma,chain, iteration, sample)
+
+## Convert to 3-D array with dims = {iterations, chains, parameters}. 
+popParArray <- array(double(nPost * nChains2 * (ncol(popParameters2) - 3)), 
+                     dim = c(nPost, nChains2, ncol(popParameters2) - 3), 
+                     dimnames =  list(NULL, NULL, setdiff(names(popParameters2), c("chain", "iteration", "sample"))))
+for(iChain in 1:nChains2){
+  popParArray[,iChain,] <- popParameters2 %>%
+    filter(chain == chains[iChain],
+           iteration > 0) %>%
+    select(-chain, -iteration, -sample) %>%
+    as.matrix
+}
+
+```
+
+
+## MCMC diagnostics and posterior distributions of parameters
+
+``` {r parameters, fig.cap = caption}
+
+options(bayesplot.base_size = 12,
+        bayesplot.base_family = "sans")
+color_scheme_set(scheme = "brightblue")
+myTheme <- theme(text = element_text(size = 12), 
+                 axis.text = element_text(size = 12))
+
+plot_mcmcHistory <- mcmcHistory(popParArray,
+                                 nParPerPage = 5, myTheme = myTheme)
+plot_mcmcDensityByChain <- mcmcDensity(popParArray, 
+                                        nParPerPage = 16, byChain = TRUE, 
+                                        myTheme = theme(text = element_text(size = 12), 
+                                                        axis.text = element_text(size = 10)))
+plot_mcmcDensity <- mcmcDensity(popParArray, nParPerPage = 16, 
+                                 myTheme = theme(text = element_text(size = 12), 
+                                                 axis.text = element_text(size = 10)))
+
+plot_mcmcHistory
+plot_mcmcDensityByChain
+plot_mcmcDensity
+mcmc_pairs(popParArray[,,!grepl("^OMEGA", dimnames(popParArray)[[3]])])
+
+caption <- paste("PK-PD modeling of time-averaged biomarker and PK data example:",
+      c(rep("MCMC trace plots.", length(plot_mcmcHistory)),
+        rep("Univariate marginal densities by chain.",
+            length(plot_mcmcDensityByChain)),
+        rep("Univariate marginal densities.",
+            length(plot_mcmcDensityByChain)),
+        rep("Bivariate marginal densities.", 2)))
+
+ptable <- monitor(popParArray, 
+                  warmup = 0, print = FALSE) %>% 
+  as.matrix() %>%
+  formatC(3) %>%
+  as.data.frame
+write.csv(ptable, file = file.path(tabDir, paste(modelName, 
+                                                 "ParameterTable.csv", sep = "")))
+
+ptable %>% 
+  rename(SEmean = se_mean, SD = sd, pct2.5 = "2.5%", pct25 = "25%", median = "50%",
+         pct75 = "75%", pct97.5 = "97.5%", Neff = "n_eff") %>%
+  mutate(parameter = rownames(.), "95% CI" = paste("(", pct2.5, ", ", pct97.5, ")", 
+                                                   sep = "")) %>%
+  select(parameter, mean, SD, median, "95% CI", Neff, Rhat) %>%
+  kable(caption = "Summary of model parameter estimates.") %>%
+  kable_styling(bootstrap_options = "striped", full_width = F)
+
+```
+
+
+```{r autocorrelation, fig.cap=caption}
+
+autcorr_plot = popParameters2 %>% tidyr::gather(key=parameter, value=value,-c(chain,iteration,sample)) %>%
+  select(-c(sample,iteration)) %>%
+  group_by(chain,parameter) %>%
+  nest() %>%
+  mutate(acf = pmap(list(chain,parameter,data), .f = function(.chain,.par,.df) {
+    x = as.numeric(.df$value)
+    y = acf(x, plot=FALSE, lag.max=20)
+    data.frame(lag=as.numeric(y$lag), acf=as.numeric(y$acf))
+  })) %>%
+  select(-data) %>%
+  unnest() %>%
+  ggplot(aes(x=lag,y=acf,fill=chain)) +
+  geom_bar(stat='identity') +
+  facet_grid( parameter ~ chain) +
+  labs(x='Lag', y='Autocorrelation')
+
+caption <- paste("PK-PD modeling of time-averaged biomarker and PK data example:",
+      "Autocorrelation plots.")
+
+autcorr_plot
+```
+
+## Construct design data frame
+
+```{r design}
+
+## For now just use the NONMEM data set
+
+design <- nmData %>%
+  filter(C == ".") %>%
+  select(-c(EVID,CMT,C))
+
+
+```
+
+## mrgsolve model code for posterior predictions
+
+```{r model code}
+
+library(mrgsolve)
+
+indCode =
+  '
+$PLUGIN mrgx
+
+$PARAM 
+THETA1 = 5.65
+THETA2 = 5.60
+THETA3 = 4.29
+THETA4 = -1.33
+CONC = 10
+
+$PRED
+
+double EMAX = 100 / (1 + exp(-THETA1));
+double EC50 = exp(THETA2);
+double GAMMA = exp(THETA3);
+double sigma = exp(THETA4);
+
+double eps = mrgx::rnorm(0.0, sigma,-100, 100);
+
+double RESP = EMAX * pow(CONC,GAMMA) / (pow(EC50,GAMMA) + pow(CONC,GAMMA));
+double simDV = RESP + eps;
+
+$CAPTURE RESP simDV
+'
+
+## Compile model
+fxaMod <- mcode("FXAmodel", indCode)
+
+if(FALSE){
+  ## Test runs
+  out <- fxaMod %>%
+    data_set(design) %>%
+    carry_out(DOSE,CONC) %>%
+    mrgsim
+  }
+
+```
+
+
+## Population predictions
+
+```{r popSim}
+
+samples <- unique(popParameters$sample)
+popSim1 <- mclapply(samples,
+                    function(thisSample){
+                      fxaMod %>%
+                        data_set(design) %>%
+                        param(popParameters %>% 
+                                filter(sample == thisSample)) %>%
+                        carry_out(sample, ID, DV, CONC, RESP, simDV, DOSE,chain,sample) %>%
+                        mrgsim %>%
+                        as.tbl
+                    }) %>%
+  bind_rows
+
+```
+
+## Posterior predictive distributions
+
+``` {r PPC, results = 'asis'}
+
+## Combined plots
+
+popPred <- popSim1 %>%
+  group_by(CONC) %>%
+  summarize(lbPop = quantile(RESP, probs = 0.05, na.rm = TRUE),
+            medianPop = quantile(RESP, probs = 0.5, na.rm = TRUE),
+            ubPop = quantile(RESP, probs = 0.95, na.rm = TRUE),
+            lbInd = quantile(simDV, probs = 0.05, na.rm = TRUE),
+            medianInd = quantile(simDV, probs = 0.5, na.rm = TRUE),
+            ubInd = quantile(simDV, probs = 0.95, na.rm = TRUE))
+
+predAll <- popPred %>%
+  left_join(design) %>%
+  mutate(DV = suppressWarnings(as.numeric(DV)))
+
+#forms <- sort(unique(predAll$FORM))
+plot_PPC <- predAll %>% ggplot(aes(x = CONC, y = DV)) + 
+  geom_line(aes(x = CONC, y = medianInd, 
+                color = "prediction interval")) +
+  geom_ribbon(aes(ymin = lbInd, ymax = ubInd, 
+                  fill = "prediction interval"), 
+              alpha = 0.25) +
+  geom_line(aes(x = CONC, y = medianPop, 
+                color = "credible interval")) +
+  geom_ribbon(aes(ymin = lbPop, ymax = ubPop, 
+                  fill = "credible interval"), 
+              alpha = 0.25) +
+  scale_color_brewer(name  ="prediction",
+                     breaks=c("prediction interval", "credible interval"),
+                     palette = "Set1") +
+  scale_fill_brewer(name  ="prediction",
+                    breaks=c("prediction interval", "credible interval"),
+                    palette = "Set1") + 
+  geom_point() +
+  labs(x = "average ME-2 plasma concentration (ng/mL)",
+       y = "average factor Xa inhibition (%)") +
+  theme(text = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        ##          legend.position = c(0.8, 0.25),
+        strip.text = element_text(size = 8)) +
+  ylim(-10,100)
+
+plot_PPC
+
+```
+
+```{r theEnd}
+
+sessionInfo()
+
+```

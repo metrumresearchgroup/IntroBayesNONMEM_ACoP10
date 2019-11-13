@@ -1,0 +1,63 @@
+$PROB fxaInhibitAvgMAP example, Emax model
+$INPUT C ID DOSE DV CONC EVID CMT               
+
+$DATA ../../../data/fxaInhAvg.csv     IGNORE=(C='C')
+
+$PRED
+
+MU_1 = THETA(1)
+MU_2 = THETA(2)
+MU_3 = THETA(3)
+MU_4 = THETA(4)
+
+LGT_EMAX = MU_1 + ETA(1)
+
+EMAX = 100 / (1 + EXP(-LGT_EMAX))
+EC50 = EXP(MU_2 + ETA(2))
+GAMMA = EXP(MU_3 + ETA(3))
+SD = EXP(MU_4 + ETA(4))
+
+RESP = EMAX * CONC**GAMMA / (EC50**GAMMA + CONC**GAMMA)
+ 
+Y = RESP + SD * ERR(1) 
+
+; Initial values of THETA
+$THETA
+2.19184207890814      ; EMAX = 100 * EXPIT(THETA(1))
+4.83251007191548  ; EC50 = EXP(THETA(2))
+-0.364821245396368    ; GAMMA = EXP(THETA(3))
+1.85891572682141   ; SD = (THETA(4)) 
+$OMEGA DIAG(4);INITIAL values of OMEGAs
+(0 FIX)
+(0 FIX)
+(0 FIX)
+(0 FIX)
+$SIGMA ;INITIAL values of SIGMAs
+(1 FIX)
+
+
+$PRIOR NWPRI
+$THETAP          ; Prior information of THETAS
+(0 FIX)      ;  THETA(1) EMAX
+(5.5 FIX)      ;  THETA(2) EC50
+(0.75 FIX)      ;  THETA(3) gamma
+(2.3 FIX)      ; THETA(4) SD
+$THETAPV BLOCK(4)     ;  variances for priors on THETAS (var-cov)
+2.0 FIX ; EMAX almost uniform
+0.00 1  ; EC50
+0.00 0.00 0.50  ; gamma
+0.00 0.00 0.00 1   ; SD
+$ESTIMATION
+METHOD = 0
+AUTO= 1
+OLKJDF= 1
+OVARF= -1
+PRINT = 100 NOABORT
+
+SIGL = 12
+SIG = 4
+MAXEVAL = 99999999
+$TABLE ID EVID CONC DV PRED
+NOPRINT ONEHEADER FILE=./fxaInhibitAvgMAP.tab
+$TABLE ID EMAX EC50 GAMMA SD
+NOPRINT ONEHEADER FILE=./fxaInhibitAvgMAPpar.tab

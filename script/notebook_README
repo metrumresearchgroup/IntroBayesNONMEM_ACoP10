@@ -1,0 +1,12 @@
+Look here for a template notebook and tips for writing in markdown to be compiled to pdf:
+
+https://gitlab.metrumrg.com/work-instructions/markdown/blob/master/script/notebook_to_pdf.r
+
+From that file, here is an example yaml header:
+#' ---
+#' title: 'Notebook to PDF demo'
+#' author: "Dan Polhamus, Kyle Baron"
+#' date: '`r format(Sys.Date(), "%B %d, %Y")`'
+#' sponsor: "Acme Pharma"
+#' projectnumber: "AP100100"
+#' ---

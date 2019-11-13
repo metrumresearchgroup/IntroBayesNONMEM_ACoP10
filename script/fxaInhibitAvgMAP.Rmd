@@ -1,0 +1,222 @@
+
+---
+title: |
+       | Introduction to Bayesian pharmacometric data analysis using NONMEM
+       |
+       | Hands-on 1: MAP Bayes example
+author: "Metrum Research Group"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output:
+  html_document:
+    css: styles/styles.css
+    highlight: pygments
+    theme: flatly
+---
+
+# NONMEM workflow example
+
+## PK-PD modeling of time-averaged biomarker and PK data
+ 
+Phase 1 single dose study in healthy volunteers
+
+* Parallel dose-escalation design
+* 8 subjects per dose arm
+* Single doses of ME-2
+    + Placebo, 1.25, 5, 10, 15, 20, 30, 40, 60 and 80 mg
+* PK: plasma concentrations of parent drug
+* Biomarker: ex vivo inhibition of factor Xa activity in plasma
+    + PK and biomarker measured at 0, 0.083, 0.167, 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8, 12, 18 and 24 hours after dose.
+    
+Hands-on exercise:
+
+* Model relationship between time-averaged factor Xa inhibition and time-averaged ME-2 plasma concentrations
+
+## Model
+  
+Sigmoid Emax model relating time-averaged \% inhibition of factor Xa activity to time-averaged ME-2 plasma concentration in the $i^{th}$ subject:
+\begin{eqnarray*}
+\overline{E}_{24,i} &\sim& N\left(\hat{E}_{24,i},\sigma\right) \\
+\hat{E}_{24,i} &=& \frac{E_{max} \overline{c}_{24,i}^\gamma}{EC_{50}^\gamma + \overline{c}_{24,i}^\gamma}
+\end{eqnarray*}
+
+Weakly informative prior distributions:
+  \begin{align*}
+    \text{logit}\left(\frac{E_{max}}{100}\right) &\sim N\left(0,
+                                                   \sqrt{2}\right) \\
+    \log\left(EC_{50}\right)  &\sim N\left(\log(245), 1\right) \\
+\log\left(\gamma\right) &\sim N\left(\log(2.1), \sqrt{0.5}\right) \\
+\log\left(\sigma\right) &\sim N\left(\log(10), 1\right)
+  \end{align*}
+
+---
+
+## Setup R environment
+
+```{r setup, results = 'hide'}
+
+rm(list = ls())
+gc()
+
+modelName <- "fxaInhibitAvgMAP"
+scriptName <- paste(modelName, "Rmd", sep = ".")
+
+## Relative paths assuming the working directory is the script directory
+## containing this script
+scriptDir <- getwd()
+projectDir <- dirname(scriptDir)
+dataDir <- file.path(projectDir, "data")
+modelDir <- file.path(projectDir, "model")
+outDir <- file.path(modelDir, modelName)
+figDir <- file.path(projectDir, "deliv", "figure", modelName)
+tabDir <- file.path(projectDir, "deliv", "table", modelName)
+invisible(dir.create(figDir, recursive = TRUE))
+invisible(dir.create(tabDir, recursive = TRUE))
+
+
+library(metrumrg)
+suppressMessages(library(tidyverse))
+library(gridExtra)
+library(parallel)
+library(knitr)
+library(kableExtra)
+library(qapply)
+library(PKPDmisc)
+
+knitr::opts_chunk$set(
+  comment = '.', 
+  fig.height = 5, 
+  fig.width = 9,
+  eval.after = 'fig.cap',
+  message = FALSE,
+  fig.path = file.path(figDir, paste(modelName, "_", sep = ""))
+)
+
+
+
+## Go back to default ggplot2 theme that was overridden by bayesplot
+theme_set(theme_gray())
+
+source(file.path(scriptDir, "tools", "stanTools2.R"))
+source(file.path(scriptDir, "tools", "functions.R"))
+
+options(mc.cores = parallel::detectCores())
+
+set.seed(11191951) 
+set.seed(10271998) 
+
+```
+
+## The NONMEM model stub
+
+```{r nonmemModel}
+
+modelFile <- file.path(modelDir, paste(modelName, "stub.ctl", sep = ""))
+modelText <- readLines(modelFile)
+cat(modelText, sep = "\n")
+
+```
+
+## Assemble initial estimates, priors and table specs
+
+```{r initsPriors}
+
+## create initial estimates
+geninit <- function(){
+    paste(c(
+    "; Initial values of THETA",
+    "$THETA",
+    paste(rnorm(1, logit(90/100), 0.25), "     ; EMAX = 100 * EXPIT(THETA(1))"),
+    paste(rnorm(1, log(120), 0.25), " ; EC50 = EXP(THETA(2))"),
+    paste(rnorm(1, log(1), 0.25), "   ; GAMMA = EXP(THETA(3))"),
+    paste(rnorm(1, log(5.9), 0.25), "  ; SD = (THETA(4)) "),
+    "$OMEGA DIAG(4);INITIAL values of OMEGAs",
+    "(0 FIX)",
+    "(0 FIX)",
+    "(0 FIX)",
+    "(0 FIX)",
+    "$SIGMA ;INITIAL values of SIGMAs",
+    "(1 FIX)",
+    sep = "\n"))
+}
+
+
+## Set parameters of the prior distribution
+priors <- paste(c("$PRIOR NWPRI",
+                  "$THETAP          ; Prior information of THETAS",
+                  "(0 FIX)      ;  THETA(1) EMAX",
+                  "(5.5 FIX)      ;  THETA(2) EC50",
+                  "(0.75 FIX)      ;  THETA(3) gamma",
+                  "(2.3 FIX)      ; THETA(4) SD",
+                  "$THETAPV BLOCK(4)     ;  variances for priors on THETAS (var-cov)",
+                  "2.0 FIX ; EMAX almost uniform",
+                  "0.00 1  ; EC50",
+                  "0.00 0.00 0.50  ; gamma",
+                  "0.00 0.00 0.00 1   ; SD"
+),
+sep = "\n")
+
+## Table statements
+tables <- paste(c("$TABLE ID EVID CONC DV PRED",
+                  "NOPRINT ONEHEADER FILE=./.tab",
+                  "$TABLE ID EMAX EC50 GAMMA SD",
+                  "NOPRINT ONEHEADER FILE=./par.tab"),
+                sep = "\n")
+
+```
+
+## Run NONMEM
+
+``` {r runStan, results = 'hide'}
+
+if(!file.exists(file.path(modelDir, modelName))) 
+  dir.create(file.path(modelDir, modelName))
+runOpt(modelName, modelDir, priors, tables, method = 0, mode = "nonpara", grid = TRUE)
+
+```
+
+```{r NONMEMResults}
+
+nmLstFile <- file.path(modelDir, modelName, modelName, paste(modelName,  ".lst", sep = ""))
+nmLstText <- readLines(nmLstFile)
+cat(nmLstText, sep = "\n")
+
+
+```
+
+```{r EstimateTable}
+
+ptab = PKPDmisc::read_nonmem(path = file.path(modelDir, modelName, modelName, 
+                                             paste(modelName, "par.tab", sep = "")))
+
+ptab %>%
+  slice(1) %>%
+  select(EMAX:SD) %>%
+  kable(caption = "Summary of model parameter estimates.") %>%
+  kable_styling(bootstrap_options = "striped", full_width = F)
+```
+
+
+
+```{r MAPplots}
+
+tab = PKPDmisc::read_nonmem(path = file.path(modelDir, modelName, modelName, 
+                                             paste(modelName, ".tab", sep = "")))
+
+p1 <- ggplot(tab, aes(x = CONC, y = DV))
+p1 + geom_point() +
+    geom_line(aes(x = CONC, y = PRED)) +
+    labs(x = "average ME-2 plasma concentration (ng/mL)",
+         y = "average factor Xa inhibition (%)") +
+    theme(text = element_text(size = 12), axis.text = element_text(size = 12),
+              legend.position = "none", strip.text = element_text(size = 8))   
+
+
+```
+
+
+
+```{r theEnd}
+
+sessionInfo()
+
+```

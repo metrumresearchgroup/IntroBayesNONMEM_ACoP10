@@ -1,0 +1,95 @@
+$PROBLEM RUN# atorv1
+$INPUT C ID TIME AMT DV CMT DOSE EVID MDV ADDL II SS FORM WT PER BLQ
+$DATA ../../../data/atorvWrkShop.csv  IGNORE=(C='C', BLQ.EQ.1)  
+
+$ABBR DECLARE INTEGER FIRST_WRITE_PAR
+$ABBR DECLARE INTEGER FIRST_WRITE_IPAR
+$ABBR DECLARE INTEGER FIRST_WRITE_IPRED
+
+$SUBROUTINES ADVAN4 TRANS4 
+
+$PK
+include '/opt/NONMEM/nm74gf/util/nonmem_reserved_general'
+
+MU_1 = THETA(1)     
+MU_2 = THETA(2) 
+
+BAYES_EXTRA_REQUEST=1
+
+VWT = LOG(WT/70) ; normalized to 70 kg adult
+
+;ATORVASTATIN
+
+CL = EXP(MU_1+(VWT*0.75)+ETA(1)) ; atv cl 
+V2 = EXP(MU_2+VWT+ETA(2))
+Q = EXP(THETA(3)+(VWT*0.75))
+V3 = EXP(THETA(5)+VWT)
+
+IF(EXP(THETA(2)).NE.0) T1 = CL/V2
+IF(EXP(THETA(2)).NE.0) T23 = Q/V2
+IF(EXP(THETA(5)).NE.0) T32 = Q/V3
+L1 = ((T1+T23+T32)+SQRT((T1+T23+T32)**2-4*T1*T32))/2
+L2 = ((T1+T23+T32)-SQRT((T1+T23+T32)**2-4*T1*T32))/2
+
+ KA = EXP(THETA(4)) + L2
+ 
+ 
+S2 = V2/1000              ; DOSE IN uM & CONC IN nM/L
+F1 = THETA(6)             ; TABLET AS REFERENCE
+IF(FORM.EQ.2)F1=THETA(7)  ; CHEWABLE F1
+AUC=(DOSE*1000)/CL 
+
+IF(BAYES_EXTRA==1 .AND. NIREC==1 .AND. NDREC==1 .AND. &
+   ITER_REPORT/nThin == INT(ITER_REPORT/nThin)) THEN 
+  IF(FIRST_WRITE_PAR==0) THEN
+    " OPEN(unit=52,FILE='./par.txt') 
+    FIRST_WRITE_PAR=1
+  ENDIF
+  " WRITE(52,'(I12,1X,F14.0, 19(1X,1G12.5),2(1X,F14.0))') ITER_REPORT, ID, &
+  " CL, V2, KA, V3,Q, SIGMA, &  
+  " OMEGA(1,1), OMEGA(2,1), OMEGA(2,2), &
+  " AUC, WT, &
+  " THETA(1),THETA(2),THETA(3),THETA(4),THETA(5),THETA(6),THETA(7),THETA(8),PER,FORM
+ENDIF
+IF(BAYES_EXTRA==1 .AND. NDREC==1 .AND. ITER_REPORT/nThin == INT(ITER_REPORT/nThin)) THEN 
+  IF(FIRST_WRITE_IPAR==0) THEN
+    " OPEN(unit=50,FILE='./ipar'//TFI(PNM_NODE_NUMBER)//'.txt') 
+    FIRST_WRITE_IPAR=1
+  ENDIF
+  " WRITE(50,'(I12,1X,F14.0,13(1X,1PG12.5))') ITER_REPORT, ID, TIME, ETA(1),ETA(2), KA, L1,L2, CL, V2, V3, Q, HL1,HL2,AUC
+ENDIF
+
+
+$ERROR
+" USE NMBAYES_INT, ONLY: ITER_REPORT,BAYES_EXTRA_REQUEST,BAYES_EXTRA 
+" USE PNM_CONFIG, ONLY: PNM_NODE_NUMBER
+" USE NM_INTERFACE, ONLY: TFI,TFD
+; Request extra information for Bayesian analysis.
+; An extra call will then be made for accepted samples
+" BAYES_EXTRA_REQUEST=1
+
+
+;    TYPE          ANLT 
+;       1    atorvastatin 
+;       2    o-hydroxy atv 
+;       3    p-hydroxy atv
+
+TYP=1
+SIG1=EXP(THETA(8))
+LOQ = 0.45          ; nM/L
+IPRED = F
+DUM = (LOQ-IPRED)/(SIG1*IPRED)
+CUMD=PHI(DUM)
+IF(BLQ.EQ.0)THEN
+  F_FLAG=0
+  Y = F*(1+SIG1*ERR(1)) ; ATV
+  TTV = F_FLAG
+ELSE
+  F_FLAG=1
+  Y=CUMD
+ENDIF
+
+
+; Code below into chains
+
+
